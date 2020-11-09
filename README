@@ -1,0 +1,14 @@
+
+
+## OpenSource
+
+- [pytorch-lightning](https://github.com/PyTorchLightning/pytorch-lightning)
+
+- [detectron2](https://github.com/facebookresearch/detectron2/)
+
+- [allennlp](https://github.com/allenai/allennlp)
+
+
+## TODO
+
+- 对于测试类的竞赛, 如果使用docker会相应很慢(docker启动过程慢), 方案可能需要变化 
