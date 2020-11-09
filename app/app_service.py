@@ -9,11 +9,9 @@
 
 import os, time, json
 import argparse
-import redis
 
 from flask import Flask, request
 from flask_cors import CORS
-from threading import Thread
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -26,12 +24,16 @@ def _framework_fit():
     except Exception:
         pass
 
+    return 'not impl'
+
 @app.route('/raceai/framework/test', methods=['POST'], endpoint='test')
 def _framework_test():
     try:
         reqjson = json.loads(request.get_data().decode())
     except Exception:
         pass
+
+    return 'not impl'
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -79,7 +79,6 @@ __build_image()
         echo "build image: $REPOSITORY:$TAG"
 
         docker build --tag $REPOSITORY:$TAG \
-            --build-arg USER_ID=$UID \
             --build-arg VENDOR=$VENDOR \
             --build-arg PROJECT=$PROJECT \
             --build-arg REPOSITORY=$REPOSITORY \

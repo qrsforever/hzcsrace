@@ -12,8 +12,6 @@ VENDOR=hzcsai_com
 PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
 
-ifnames=("eth0" "ens3")
-
 docker run -d --runtime nvidia --name ${PROJECT} --restart unless-stopped \
     --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
     --network host \
