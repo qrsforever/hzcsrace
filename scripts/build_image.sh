@@ -1,7 +1,7 @@
 #!/bin/bash
 #=================================================================
-# date: 2019-12-02 12:43:39
-# title: build_images
+# date: 2020-11-09
+# title: build_image
 # author: QRS
 #=================================================================
 
@@ -97,8 +97,6 @@ __build_image()
             exit $?
         fi
         docker tag $REPOSITORY:$TAG $REPOSITORY
-
-        cd - >/dev/null
     else
         echo "No need build new image $REPOSITORY!"
     fi
@@ -106,7 +104,7 @@ __build_image()
 
 __main()
 {
-    __build_image "raceai" $MAJOR_RACEAI $MINOR_RACEAI $force
+    __build_image "raceai" $MAJOR_RACEAI $MINOR_RACEAI 1
 }
 
 __main $@
