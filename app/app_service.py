@@ -10,6 +10,7 @@
 import os, time, json
 import argparse
 
+from raceai.utils.misc import race_timeit
 from flask import Flask, request
 from flask_cors import CORS
 
@@ -18,6 +19,7 @@ CORS(app, supports_credentials=True)
 
 
 @app.route('/raceai/framework/fit', methods=['POST'], endpoint='fit')
+@race_timeit(app.logger.info)
 def _framework_fit():
     try:
         reqjson = json.loads(request.get_data().decode())
@@ -27,6 +29,7 @@ def _framework_fit():
     return 'not impl'
 
 @app.route('/raceai/framework/test', methods=['POST'], endpoint='test')
+@race_timeit(app.logger.info)
 def _framework_test():
     try:
         reqjson = json.loads(request.get_data().decode())
