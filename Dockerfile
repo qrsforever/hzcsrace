@@ -45,7 +45,7 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
         tzdata iputils-ping net-tools && \
     pip uninstall enum34 -y && \
     $PIP_INSTALL GPUtil psutil packaging zerorpc \
-        flask flask_cors \
+        flask flask_cors omegaconf \
         torchsummary tensorboard seaborn \
         pyhocon protobuf "jsonnet>=0.10.0"
 

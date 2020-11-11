@@ -7,12 +7,17 @@
 # @version 1.0
 # @date 2020-11-09
 
-import os, time, json
+
+import json
 import argparse
 
-from raceai.utils.misc import race_timeit
+from raceai.utils.misc import race_timeit, race_subprocess
+from raceai.utils.error import catch_error
 from flask import Flask, request
 from flask_cors import CORS
+from omegaconf import OmegaConf
+from raceai.cls.test import image_classifier_test
+
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -20,23 +25,26 @@ CORS(app, supports_credentials=True)
 
 @app.route('/raceai/framework/fit', methods=['POST'], endpoint='fit')
 @race_timeit(app.logger.info)
+@catch_error
 def _framework_fit():
     try:
-        reqjson = json.loads(request.get_data().decode())
+        reqjson = json.loads(request.get_data().decode()) # noqa
     except Exception:
         pass
 
     return 'not impl'
+
 
 @app.route('/raceai/framework/test', methods=['POST'], endpoint='test')
 @race_timeit(app.logger.info)
+@catch_error
 def _framework_test():
-    try:
-        reqjson = json.loads(request.get_data().decode())
-    except Exception:
-        pass
+    reqjson = json.loads(request.get_data().decode())
+    if reqjson['task'] == 'cls.test':
+        cfg = OmegaConf.create(reqjson['cfg'])
+        with race_subprocess(image_classifier_test, cfg) as queue:
+            return queue.get()
 
-    return 'not impl'
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
