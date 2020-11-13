@@ -62,12 +62,12 @@ RUN cd /raceai/codes/hzcsrace/projects/pytorch-lightning && \
 
 # detectron2
 
-# COPY projects/detectron2 /raceai/codes/hzcsrace/projects/detectron2
-# RUN cd /raceai/codes/hzcsrace/projects/detectron2 && \
-#     pip install --no-cache-dir --retries 20 --timeout 120 \
-#         --trusted-host mirrors.intra.didiyun.com \
-#         --index-url http://mirrors.intra.didiyun.com/pip/simple \
-#         --editable .
+COPY projects/detectron2 /raceai/codes/hzcsrace/projects/detectron2
+RUN cd /raceai/codes/hzcsrace/projects/detectron2 && \
+    pip install --no-cache-dir --retries 20 --timeout 120 \
+        --trusted-host mirrors.intra.didiyun.com \
+        --index-url http://mirrors.intra.didiyun.com/pip/simple \
+        --editable .
 
 
 # allennlp

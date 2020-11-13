@@ -16,7 +16,10 @@ from raceai.utils.error import catch_error
 from flask import Flask, request
 from flask_cors import CORS
 from omegaconf import OmegaConf
-from raceai.cls.test import image_classifier_test
+from raceai.runner.test import (
+    image_classifier_test,
+    image_dectection_test
+)
 
 
 app = Flask(__name__)
@@ -43,6 +46,10 @@ def _framework_test():
     if reqjson['task'] == 'cls.test':
         cfg = OmegaConf.create(reqjson['cfg'])
         with race_subprocess(image_classifier_test, cfg) as queue:
+            return queue.get()
+    elif reqjson['task'] == 'det.test':
+        cfg = OmegaConf.create(reqjson['cfg'])
+        with race_subprocess(image_dectection_test, cfg) as queue:
             return queue.get()
 
 

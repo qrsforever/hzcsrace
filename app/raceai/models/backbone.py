@@ -15,9 +15,9 @@ class Resnet18(nn.Module):
     def __init__(self, cfg):
         super().__init__()
         if cfg.ckpt_path.startswith('file://'):
-            ckpt_path = cfg.ckpt_path[7:]
+            ckpt_path = cfg.weights[7:]
         else:
-            ckpt_path = cfg.ckpt_path
+            ckpt_path = cfg.weights
         self.model = resnet18(pretrained=False)
         self.model.fc = nn.Linear(self.model.fc.in_features, cfg.num_classes)
         self.model.load_state_dict(torch.load(ckpt_path))
