@@ -6,7 +6,10 @@ import time
 import importlib
 import multiprocessing
 
+from omegaconf.dictconfig import DictConfig
 from contextlib import contextmanager
+
+DEBUG = True
 
 
 def race_blockprint(func):
@@ -50,6 +53,25 @@ def race_subprocess(func, *args):
 
 
 def race_load_class(impstr):
+    if DEBUG:
+        print(f'load class: {impstr}')
     module_name, class_name = impstr.rsplit('.', 1)
     module_ = importlib.import_module(module_name)
     return getattr(module_, class_name)
+
+
+def race_convert_dictkeys(x, uppercase=True):
+    fcvt = str.upper if uppercase else str.lower
+    if isinstance(x, (dict, DictConfig)):
+        return dict((fcvt(k), race_convert_dictkeys(v, uppercase)) for k, v in x.items())
+    return x
+
+
+def race_prepare_weights(x):
+    if x.startswith('http://') or x.startswith('ftp://'):
+        raise NotImplementedError('weight schema: http')
+    elif x.startswith('oss://'): 
+        raise NotImplementedError('weight schema: oss')
+    elif x.startswith('file://'): 
+        x = x[7:]
+    return x

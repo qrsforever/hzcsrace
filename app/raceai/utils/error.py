@@ -4,13 +4,20 @@
 import traceback
 import json
 
+DEBUG = True
+
 
 def errmsg(code, err):
-    return {
-            "errno": code,
-            "result": {
-                'errtext': err,
-                'traceback': traceback.format_exc(limit=10)}}
+    msg = {
+        'errno': code,
+        'result': {
+            'errtext': str(err),
+            'traceback': traceback.format_exc(limit=10)
+        }
+    }
+    if DEBUG:
+        print(msg)
+    return msg
 
 
 def catch_error(func):

@@ -51,6 +51,7 @@ def _framework_test():
         cfg = OmegaConf.create(reqjson['cfg'])
         with race_subprocess(image_dectection_test, cfg) as queue:
             return queue.get()
+    raise NotImplementedError(f"reqjson['task']")
 
 
 if __name__ == "__main__":
