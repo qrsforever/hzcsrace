@@ -32,7 +32,6 @@ class RaceDataset(ABC, Dataset):
 
 class PredictDirectoryImageRaw(RaceDataset):
     def __init__(self, img_path):
-        print(img_path)
         self.images = self.data_reader(img_path)
 
     def data_reader(self, path):
@@ -53,6 +52,8 @@ class PredictDirectoryImageRaw(RaceDataset):
 
 class PredictSingleImageRaw(PredictDirectoryImageRaw):
     def data_reader(self, path):
+        if isinstance(path, (list, tuple)):
+            return path
         return [path]
 
 

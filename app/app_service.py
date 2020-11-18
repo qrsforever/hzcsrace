@@ -10,6 +10,7 @@
 
 import json
 import argparse
+import tempfile
 
 from raceai.utils.misc import race_timeit, race_subprocess
 from raceai.utils.error import catch_error
@@ -42,16 +43,17 @@ def _framework_fit():
 @race_timeit(app.logger.info)
 @catch_error
 def _framework_test():
-    reqjson = json.loads(request.get_data().decode())
-    if reqjson['task'] == 'cls.test':
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        reqjson = json.loads(request.get_data().decode())
+        reqjson['cfg']['general']['tmp_dir'] = tmp_dir
         cfg = OmegaConf.create(reqjson['cfg'])
-        with race_subprocess(image_classifier_test, cfg) as queue:
-            return queue.get()
-    elif reqjson['task'] == 'det.test':
-        cfg = OmegaConf.create(reqjson['cfg'])
-        with race_subprocess(image_dectection_test, cfg) as queue:
-            return queue.get()
-    raise NotImplementedError(f"reqjson['task']")
+        if reqjson['task'] == 'cls.test':
+            with race_subprocess(image_classifier_test, cfg) as queue:
+                return queue.get()
+        elif reqjson['task'] == 'det.test':
+            with race_subprocess(image_dectection_test, cfg) as queue:
+                return queue.get()
+        raise NotImplementedError(f"reqjson['task']")
 
 
 if __name__ == "__main__":

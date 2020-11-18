@@ -1,0 +1,35 @@
+{
+    "runner": {
+        "yaml_file": "COCO-Detection/retinanet_R_50_FPN_3x.yaml"
+    },
+    "general": {
+        "work_dir": "/tmp"
+    },
+    "data": {
+        "class_name": "raceai.data.process.PathListDataLoader",  
+        "params": {
+            "data_name": "licenseplate",
+            "data_source": [
+                "/raceai/tmp/det_test.jpeg"
+            ],
+            "dataset": {
+                "class_name": "raceai.data.PredictSingleImageRaw",
+                "params": {}
+            }
+        }
+    },
+    "model": {
+        "class_name": "raceai.models.detectron.Retinanet",  
+        "params": {
+            "device": "cpu",
+            "weights": "/raceai/data/ckpts/det_licenseplate_retinanet.pth",
+            "retinanet": {
+                "score_thresh_test": 0.85
+            },
+            "roi_heads": {
+                "score_thresh_test": 0.85,
+                "num_classes": 1
+            }
+        }
+    }
+}

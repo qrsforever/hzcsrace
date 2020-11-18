@@ -1,0 +1,30 @@
+{
+    "runner": {
+        "device": "cpu",
+        "yaml_file": "COCO-InstanceSegmentation/mask_rcnn_X_101_32x8d_FPN_3x.yaml"
+    },
+    "general": {
+        "work_dir": "/tmp"
+    },
+    "data": {
+        "class_name": "raceai.data.process.Base64DataLoader",  
+        "params": {
+            "data_name": "faces",
+            "data_source": "",
+            "dataset": {
+                "class_name": "raceai.data.PredictSingleImageRaw",
+                "params": {}
+            }
+        }
+    },
+    "model": {
+        "class_name": "raceai.models.detectron.MaskRCNN",  
+        "params": {
+            "weights": "/raceai/data/ckpts/faces_MaskRCNN.pth",
+            "roi_heads": {
+                "score_thresh_test": 0.85,
+                "num_classes": 1
+            }
+        }
+    }
+}

@@ -26,5 +26,5 @@ docker run -d${arg} --runtime nvidia --name ${PROJECT} \
     --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
     --network host --entrypoint /bin/bash \
     --volume /raceai/data:/raceai/data \
-    --volume $TOP_DIR/app:/raceai/app \
+    --volume $TOP_DIR/app:/raceai/codes/app \
     $REPOSITORY $cmd

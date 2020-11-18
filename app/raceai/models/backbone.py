@@ -19,6 +19,11 @@ class Resnet18(nn.Module):
         self.model = resnet18(pretrained=False)
         self.model.fc = nn.Linear(self.model.fc.in_features, cfg.num_classes)
         self.model.load_state_dict(torch.load(weights))
+        self.use_gpu = True if cfg.device == 'cuda' else False
+        if self.use_gpu:
+            self.model.cuda()
 
     def forward(self, x):
+        if self.use_gpu:
+            x = x.cuda()
         return self.model(x)

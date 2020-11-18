@@ -26,3 +26,7 @@ class DetBaseModel(object):
 
 class MaskRCNN(DetBaseModel):
     pass
+
+
+class Retinanet(DetBaseModel):
+    pass
