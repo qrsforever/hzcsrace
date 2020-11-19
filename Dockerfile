@@ -35,12 +35,12 @@ ENV TZ=Asia/Shanghai \
 
 # Base
 
-RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
+RUN APT_INSTALL="apt install -y --no-install-recommends" && \
     PIP_INSTALL="pip install -U --no-cache-dir --retries 20 --timeout 120 \
         --trusted-host mirrors.intra.didiyun.com \
         --index-url http://mirrors.intra.didiyun.com/pip/simple" && \
     sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.didiyun\.com\/ubuntu\//g' /etc/apt/sources.list && \
-    apt-get update --fix-missing && \
+    apt update --fix-missing && pip install -U pip && \
     DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
         tzdata iputils-ping net-tools libgl1-mesa-glx && \
     pip uninstall enum34 -y && \
@@ -49,6 +49,10 @@ RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
         torchsummary tensorboard seaborn \
         pyhocon protobuf "jsonnet>=0.10.0"
 
+# update python3
+
+# RUN update-alternatives --install /usr/local/bin/python3 python3 /usr/bin/python3.8 1 && \
+#     update-alternatives --install /usr/local/bin/python  python  /usr/bin/python3.8 1
 
 # pytorch-lightning
 

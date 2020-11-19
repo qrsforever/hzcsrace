@@ -1,0 +1,101 @@
+FROM nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04
+
+LABEL maintainer="hzcskrace@hzcsai.com"
+
+ARG VENDOR
+ARG PROJECT
+ARG REPOSITORY
+ARG TAG
+ARG DATE
+ARG VERSION
+ARG URL
+ARG COMMIT
+ARG BRANCH
+ARG PYTHON_VERSION=3.8
+
+LABEL org.label-schema.schema-version="1.0" \
+      org.label-schema.build-date=$DATE \
+      org.label-schema.name=$REPOSITORY \
+      org.label-schema.description="HZCS RACE Base" \
+      org.label-schema.url="https://www.hzcsai.com" \
+      org.label-schema.vcs-url=$URL \
+      org.label-schema.vcs-ref=$COMMIT \
+      org.label-schema.vcs-branch=$BRANCH \
+      org.label-schema.vendor=$VENDOR \
+      org.label-schema.version=$VERSION
+
+LABEL com.nvidia.volumes.needed="nvidia_driver"
+
+WORKDIR /raceai
+
+ENV TZ=Asia/Shanghai \
+    LC_ALL=C.UTF-8 \
+    PYTHONIOENCODING=utf-8 \
+    PATH=/raceai/codes/bin:/opt/conda/bin:$PATH \
+    PYTHONPATH=/raceai/codes/app:$PYTHONPATH    
+
+# Base
+
+RUN APT_INSTALL="apt-get install -y --no-install-recommends" && \
+    sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.didiyun\.com\/ubuntu\//g' /etc/apt/sources.list && \
+    gpg --keyserver keyserver.ubuntu.com --recv-keys F60F4B3D7FA2AF80 && \
+    apt-get update --fix-missing && \
+    DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
+        build-essential cmake  git curl ca-certificates  \
+        libjpeg-dev libpng-dev \
+        tzdata iputils-ping net-tools libgl1-mesa-glx
+
+RUN curl -o ~/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
+     chmod +x ~/miniconda.sh && \
+     ~/miniconda.sh -b -p /opt/conda && \
+     rm ~/miniconda.sh && \
+     /opt/conda/bin/conda install -y python=$PYTHON_VERSION numpy pyyaml scipy ipython mkl mkl-include ninja cython typing && \
+     /opt/conda/bin/conda install -y -c pytorch magma-cuda100 && \
+     /opt/conda/bin/conda clean -ya
+
+
+# pytorch-lightning
+
+# COPY projects/pytorch-lightning /raceai/codes/projects/pytorch-lightning
+# RUN cd /raceai/codes/projects/pytorch-lightning && \
+#     pip install --no-cache-dir --retries 20 --timeout 120 \
+#         --trusted-host mirrors.intra.didiyun.com \
+#         --index-url http://mirrors.intra.didiyun.com/pip/simple \
+#         --editable .
+
+
+# detectron2
+
+# COPY projects/detectron2 /raceai/codes/projects/detectron2
+# RUN cd /raceai/codes/projects/detectron2 && \
+#     pip install --no-cache-dir --retries 20 --timeout 120 \
+#         --trusted-host mirrors.intra.didiyun.com \
+#         --index-url http://mirrors.intra.didiyun.com/pip/simple \
+#         --editable .
+
+
+# allennlp
+
+
+# Clean
+
+# RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone && \
+#     ldconfig && \
+#     apt-get clean && \
+#     apt-get autoremove && \
+#     rm -rf /var/lib/apt/lists/* /tmp/* ~/*
+
+
+# # This must be done before pip so that requirements.txt is available
+# WORKDIR /opt/pytorch
+# COPY . .
+# 
+# RUN git submodule sync && git submodule update --init --recursive
+# RUN TORCH_CUDA_ARCH_LIST="3.5 5.2 6.0 6.1 7.0+PTX" TORCH_NVCC_FLAGS="-Xfatbin -compress-all" \
+#     CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
+#     pip install -v .
+# 
+# RUN git clone https://github.com/pytorch/vision.git && cd vision && pip install -v .
+# 
+# WORKDIR /workspace
+# RUN chmod -R a+w .

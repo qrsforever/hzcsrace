@@ -1,3 +1,4 @@
 .allennlp
 .detectron2
+.yolov5
 .pytorch-lightning
