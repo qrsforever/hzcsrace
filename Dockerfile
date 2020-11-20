@@ -1,4 +1,4 @@
-FROM ufoym/deepo:pytorch-py36-cu101
+FROM ufoym/deepo:1.7.0.dev20200819
 
 LABEL maintainer="hzcskrace@hzcsai.com"
 
@@ -40,11 +40,11 @@ RUN APT_INSTALL="apt install -y --no-install-recommends" && \
         --trusted-host mirrors.intra.didiyun.com \
         --index-url http://mirrors.intra.didiyun.com/pip/simple" && \
     sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.didiyun\.com\/ubuntu\//g' /etc/apt/sources.list && \
-    apt update --fix-missing && pip install -U pip && \
+    apt update --fix-missing && $PIP_INSTALL install -U pip && \
     DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
         tzdata iputils-ping net-tools libgl1-mesa-glx && \
     pip uninstall enum34 -y && \
-    $PIP_INSTALL GPUtil psutil packaging zerorpc \
+    $PIP_INSTALL pip GPUtil psutil packaging zerorpc \
         flask flask_cors omegaconf opencv-python \
         torchsummary tensorboard seaborn \
         pyhocon protobuf "jsonnet>=0.10.0"
@@ -63,7 +63,6 @@ RUN cd /raceai/codes/projects/pytorch-lightning && \
         --index-url http://mirrors.intra.didiyun.com/pip/simple \
         --editable .
 
-
 # detectron2
 
 COPY projects/detectron2 /raceai/codes/projects/detectron2
@@ -73,6 +72,9 @@ RUN cd /raceai/codes/projects/detectron2 && \
         --index-url http://mirrors.intra.didiyun.com/pip/simple \
         --editable .
 
+# yolov5
+COPY projects/yolov5 /raceai/codes/projects/yolov5
+ENV PYTHONPATH=/raceai/codes/projects/yolov5:$PYTHONPATH    
 
 # allennlp
 
