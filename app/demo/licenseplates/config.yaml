@@ -1,0 +1,7 @@
+train: /raceai/data/datasets/licenseplates/images/train
+val: /raceai/data/datasets/licenseplates/images/val
+test: /raceai/data/datasets/licenseplates/images/val
+
+nc: 1
+
+names: ['licenseplates']
