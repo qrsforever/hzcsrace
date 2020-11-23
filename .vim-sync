@@ -1,0 +1,16 @@
+#!/bin/bash
+
+remote_hostname='eta'
+remote_relative_path='workspace/codes/hzcsai_com/hzcsrace'
+
+cd $(dirname $0)
+
+if [[ 'upload' == $1 ]]
+then
+    rsync -azcul --exclude ".git" --relative "$2/$3" "$remote_hostname:$remote_relative_path"
+elif [[ 'download' == $1 ]]
+then
+    rsync -azcul --exclude ".git" "$remote_hostname:$remote_relative_path/$2/$3" "$2/$3"
+fi
+
+cd -
