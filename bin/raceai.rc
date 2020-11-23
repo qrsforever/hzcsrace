@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [[ `id -u` == 0 ]]
+then
+    mount -v -t cifs -o username=lidong,password=1,sec=ntlmssp,iocharset=utf8,uid=1000,gid=1000 //172.16.0.211/raceai /raceai/codes
+else
+    sudo mount -v -t cifs -o username=lidong,password=1,sec=ntlmssp,iocharset=utf8,uid=1000,gid=1000 //172.16.0.211/raceai /raceai/codes
+fi
+
+sshfs -F /home/pi/.ssh/config lidong@116.85.5.40:/data /raceai/eta
+python3 /raceai/codes/bin/lcd_ip.py

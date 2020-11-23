@@ -1,0 +1,12 @@
+[Unit]
+Description=Init Raceai Environment
+After=multi-user.target
+[Service]
+Type=simple
+ExecStart=/raceai/raceai.rc
+WorkingDirectory=/raceai
+Restart=always
+User=pi
+Group=pi
+[Install]
+WantedBy=multi-user.target
