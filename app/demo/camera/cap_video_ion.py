@@ -35,3 +35,11 @@ while(True):
 
 plt.ioff()
 plt.show()
+
+# plt.ion()
+# img = plt.imshow(np.arange(480*640).reshape(480, 640))
+# img.set_data(np.arange(480*640).reshape(480, 640))
+# plt.pause(0.02)
+# time.sleep(10)                            
+                                              
+

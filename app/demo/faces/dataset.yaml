@@ -1,0 +1,7 @@
+train: /raceai/data/datasets/faces/images/train
+val: /raceai/data/datasets/faces/images/val
+test: /raceai/data/datasets/faces/images/val
+
+nc: 1
+
+names: ['faces']

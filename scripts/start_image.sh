@@ -27,4 +27,5 @@ docker run -d${arg} --runtime nvidia --name ${PROJECT} \
     --network host \
     --volume /raceai/data:/raceai/data \
     --volume $TOP_DIR/app:/raceai/codes/app \
+    --volume $TOP_DIR/projects/yolov5:/raceai/codes/projects/yolov5 \
     $REPOSITORY $cmd
