@@ -42,10 +42,11 @@ RUN APT_INSTALL="apt install -y --no-install-recommends" && \
     sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.didiyun\.com\/ubuntu\//g' /etc/apt/sources.list && \
     apt update --fix-missing && $PIP_INSTALL install -U pip && \
     DEBIAN_FRONTEND=noninteractive $APT_INSTALL \
-        tzdata iputils-ping net-tools libgl1-mesa-glx && \
+        tzdata iputils-ping jq net-tools libgl1-mesa-glx && \
     pip uninstall enum34 -y && \
     $PIP_INSTALL GPUtil psutil packaging zerorpc \
         flask flask_cors omegaconf opencv-python \
+        onnx onnxruntime \
         torchsummary tensorboard seaborn \
         pyhocon protobuf "jsonnet>=0.10.0"
 

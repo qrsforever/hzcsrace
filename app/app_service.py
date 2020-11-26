@@ -12,25 +12,24 @@ import json
 import argparse
 import tempfile
 
+import raceai.runner # noqa
+
+from raceai.utils.registrable import Registrable
 from raceai.utils.misc import race_timeit, race_subprocess
 from raceai.utils.error import catch_error
 from flask import Flask, request
 from flask_cors import CORS
 from omegaconf import OmegaConf
-from raceai.runner.test import (
-    image_classifier_test,
-    image_dectection_test
-)
 
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
 
-@app.route('/raceai/framework/fit', methods=['POST'], endpoint='fit')
+@app.route('/raceai/framework/training', methods=['POST'], endpoint='training')
 @race_timeit(app.logger.info)
 @catch_error
-def _framework_fit():
+def _framework_training():
     try:
         reqjson = json.loads(request.get_data().decode()) # noqa
     except Exception:
@@ -39,21 +38,23 @@ def _framework_fit():
     return 'not impl'
 
 
-@app.route('/raceai/framework/test', methods=['POST'], endpoint='test')
+@app.route('/raceai/framework/inference', methods=['POST'], endpoint='inference')
 @race_timeit(app.logger.info)
 @catch_error
-def _framework_test():
+def _framework_inference():
     with tempfile.TemporaryDirectory() as tmp_dir:
         reqjson = json.loads(request.get_data().decode())
-        reqjson['cfg']['general']['tmp_dir'] = tmp_dir
+
+        #### debug
+        with open('/raceai/data/tmp/raceai.json', 'w') as fw:
+            json.dump(reqjson, fw)
+        ####
+        reqjson['cfg']['runner']['cache_dir'] = tmp_dir
+
         cfg = OmegaConf.create(reqjson['cfg'])
-        if reqjson['task'] == 'cls.test':
-            with race_subprocess(image_classifier_test, cfg) as queue:
-                return queue.get()
-        elif reqjson['task'] == 'det.test':
-            with race_subprocess(image_dectection_test, cfg) as queue:
-                return queue.get()
-        raise NotImplementedError(f"reqjson['task']")
+        runner = Registrable.get_caller(reqjson['task'])
+        with race_subprocess(runner, cfg) as queue:
+            return queue.get()
 
 
 if __name__ == "__main__":

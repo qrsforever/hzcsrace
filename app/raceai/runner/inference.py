@@ -4,19 +4,19 @@
 import argparse
 import json
 import torch
-import base64
-import io
+import base64 # noqa
+import io # noqa
 import cv2 # noqa
-import PIL.Image as Image
+import PIL.Image as Image # noqa
 import matplotlib.pyplot as plt # noqa
 
 from omegaconf import OmegaConf
 from detectron2.engine import DefaultPredictor
 from detectron2.utils.visualizer import Visualizer, ColorMode
 
+from raceai.utils.registrable import FunctionRegister
 from raceai.utils.error import catch_error
 from raceai.utils.misc import race_load_class
-
 
 # cfg
 # {
@@ -52,14 +52,15 @@ from raceai.utils.misc import race_load_class
 # }
 
 
+@FunctionRegister.register('cls.inference')
 @catch_error
 def image_classifier_test(cfg):
     # Data
-    data_loader = race_load_class(cfg.data.class_name)(cfg.general.tmp_dir, cfg.data.params)
+    data_loader = race_load_class(cfg.data.class_name)(cfg.runner.cache_dir, cfg.data.params)
     test_loader = data_loader.get_testloader()
 
     # Model
-    test_model = race_load_class(cfg.model.class_name)(cfg.model.params)
+    test_model = race_load_class(cfg.model.class_name)(cfg.runner.device, cfg.model.params)
 
     # Test
     test_model.eval()
@@ -104,16 +105,17 @@ def image_classifier_test(cfg):
 #     }
 # }
 
+@FunctionRegister.register('det.inference')
 @catch_error
-def image_dectection_test(cfg):
+def image_detection_test(cfg):
     # Data
-    data_loader = race_load_class(cfg.data.class_name)(cfg.general.tmp_dir, cfg.data.params)
+    data_loader = race_load_class(cfg.data.class_name)(cfg.runner.cache_dir, cfg.data.params)
     test_loader = data_loader.get_testloader()
 
     # Model
     test_model = race_load_class(cfg.model.class_name)(cfg.model.params)
     _cfg = test_model.merge_cfg(cfg.runner.yaml_file)
-    _cfg.OUTPUT_DIR = cfg.general.tmp_dir
+    _cfg.OUTPUT_DIR = cfg.runner.cache_dir
 
     # Test
     im = test_loader.dataset[0]
@@ -150,11 +152,11 @@ def image_dectection_test(cfg):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-            '--task',
-            default='0.0.0.0',
+            '--cache_dir',
+            default='/tmp',
             type=str,
-            dest='task',
-            help="task: cls.test det.test")
+            dest='cache_dir',
+            help="cache dir")
     parser.add_argument(
             '--config',
             default='0.0.0.0',
@@ -164,15 +166,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    runner = None
-    if args.task == 'cls.test':
-        runner = image_classifier_test
-    elif args.task == 'det.test':
-        runner = image_dectection_test
-    else:
-        print('not impl task %s' % args.task)
-
     with open(args.config, 'r') as f:
-        cfg = OmegaConf.create(json.load(f))
+        config = json.load(f)
+        config['cfg']['runner']['cache_dir'] = args.cache_dir
+        runner = FunctionRegister.get_caller(config['task'])
+        cfg = OmegaConf.create(config['cfg'])
 
     print(runner(cfg))

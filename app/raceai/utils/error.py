@@ -1,10 +1,11 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+import functools
 import traceback
 import json
 
-DEBUG = True
+DEBUG = False
 
 
 def errmsg(code, err):
@@ -21,6 +22,7 @@ def errmsg(code, err):
 
 
 def catch_error(func):
+    @functools.wraps(func)
     def decorator(*args, **kwargs):
         try:
             return func(*args, **kwargs)

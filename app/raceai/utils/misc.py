@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+import functools
 import importlib
 import multiprocessing
 
@@ -13,6 +14,7 @@ DEBUG = True
 
 
 def race_blockprint(func):
+    @functools.wraps(func)
     def decorator(*args, **kwargs):
         sys.stdout = open(os.devnull, 'w')
         sys.stderr = open(os.devnull, 'w')
@@ -25,6 +27,7 @@ def race_blockprint(func):
 
 def race_timeit(handler):
     def decorator(func):
+        @functools.wraps(func)
         def _timed(*args, **kwargs):
             ts = time.time()
             result = func(*args, **kwargs)
@@ -34,22 +37,6 @@ def race_timeit(handler):
             return result
         return _timed
     return decorator
-
-
-@contextmanager
-def race_subprocess(func, *args):
-    queue = multiprocessing.Queue()
-
-    def _target(queue, *args):
-        try:
-            queue.put(func(*args))
-        except Exception as err:
-            queue.put({'error': '{}'.format(err)})
-
-    proc = multiprocessing.Process(target=_target, args=(queue, *args))
-    proc.start()
-    yield queue
-    proc.join()
 
 
 def race_load_class(impstr):
@@ -70,8 +57,24 @@ def race_convert_dictkeys(x, uppercase=True):
 def race_prepare_weights(x):
     if x.startswith('http://') or x.startswith('ftp://'):
         raise NotImplementedError('weight schema: http')
-    elif x.startswith('oss://'): 
+    elif x.startswith('oss://'):
         raise NotImplementedError('weight schema: oss')
-    elif x.startswith('file://'): 
+    elif x.startswith('file://'):
         x = x[7:]
     return x
+
+
+@contextmanager
+def race_subprocess(func, *args):
+    queue = multiprocessing.Queue()
+
+    def _target(queue, *args):
+        try:
+            queue.put(func(*args))
+        except Exception as err:
+            queue.put({'errno': 90099, 'result': '{}'.format(err)})
+
+    proc = multiprocessing.Process(target=_target, args=(queue, *args))
+    proc.start()
+    yield queue
+    proc.join()

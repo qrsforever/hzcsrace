@@ -3,27 +3,36 @@
 
 import torch
 import torch.nn as nn
+from abc import ABC, abstractmethod # noqa
 from torchvision.models import resnet18
 from raceai.utils.misc import race_prepare_weights
 
 
-class Vgg16(object):
-    def __init__(self, cfg):
-        pass
-
-
-class Resnet18(nn.Module):
-    def __init__(self, cfg):
+class BBM(ABC, nn.Module):
+    def __init__(self, device, cfg):
         super().__init__()
-        weights = race_prepare_weights(cfg.weights)
-        self.model = resnet18(pretrained=False)
-        self.model.fc = nn.Linear(self.model.fc.in_features, cfg.num_classes)
-        self.model.load_state_dict(torch.load(weights))
-        self.use_gpu = True if cfg.device == 'cuda' else False
+        self.bbmodel = self.tl_model(cfg.num_classes, cfg.weights)
+        self.use_gpu = True if device == 'cuda' else False
         if self.use_gpu:
-            self.model.cuda()
+            self.bbmodel.cuda()
+
+    def use_gpu(self):
+        return self.use_gpu
 
     def forward(self, x):
         if self.use_gpu:
             x = x.cuda()
-        return self.model(x)
+        return self.bbmodel(x)
+
+    @abstractmethod
+    def tl_model(self, num_classes, weights):
+        """
+        """
+
+
+class Resnet18(BBM):
+    def tl_model(self, num_classes, weights):
+        model = resnet18(pretrained=False)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        model.load_state_dict(torch.load(race_prepare_weights(weights)))
+        return model
