@@ -25,34 +25,42 @@ from omegaconf import OmegaConf
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
+app.debug = True
+app_logger = app.logger.info
+
 
 @app.route('/raceai/framework/training', methods=['POST'], endpoint='training')
-@race_timeit(app.logger.info)
 @catch_error
+@race_timeit(app_logger)
 def _framework_training():
-    try:
-        reqjson = json.loads(request.get_data().decode()) # noqa
-    except Exception:
-        pass
+    reqjson = json.loads(request.get_data().decode())
 
-    return 'not impl'
+    #### debug
+    with open('/raceai/data/tmp/raceai.training.json', 'w') as fw:
+        json.dump(reqjson, fw)
+    ####
+
+    cfg = OmegaConf.create(reqjson['cfg'])
+    runner = Registrable.get_runner(reqjson['task'])
+    with race_subprocess(runner, cfg) as queue:
+        return queue.get()
 
 
 @app.route('/raceai/framework/inference', methods=['POST'], endpoint='inference')
-@race_timeit(app.logger.info)
 @catch_error
+@race_timeit(app_logger)
 def _framework_inference():
     with tempfile.TemporaryDirectory() as tmp_dir:
         reqjson = json.loads(request.get_data().decode())
 
         #### debug
-        with open('/raceai/data/tmp/raceai.json', 'w') as fw:
-            json.dump(reqjson, fw)
+        # with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
+        #     json.dump(reqjson, fw)
         ####
         reqjson['cfg']['runner']['cache_dir'] = tmp_dir
 
         cfg = OmegaConf.create(reqjson['cfg'])
-        runner = Registrable.get_caller(reqjson['task'])
+        runner = Registrable.get_runner(reqjson['task'])
         with race_subprocess(runner, cfg) as queue:
             return queue.get()
 
@@ -66,6 +74,12 @@ if __name__ == "__main__":
             dest='host',
             help="host to run raceai service")
     parser.add_argument(
+            '--debug',
+            default=0,
+            type=int,
+            dest='debug',
+            help="debug mode")
+    parser.add_argument(
             '--port',
             default=9119,
             type=int,
@@ -75,6 +89,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     try:
-        app.run(host=args.host, port=args.port)
+        app.run(host=args.host, port=args.port, debug=bool(args.debug))
     finally:
         pass

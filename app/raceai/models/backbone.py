@@ -9,10 +9,10 @@ from raceai.utils.misc import race_prepare_weights
 
 
 class BBM(ABC, nn.Module):
-    def __init__(self, device, cfg):
+    def __init__(self, cfg):
         super().__init__()
         self.bbmodel = self.tl_model(cfg.num_classes, cfg.weights)
-        self.use_gpu = True if device == 'cuda' else False
+        self.use_gpu = True if cfg.device == 'cuda' else False
         if self.use_gpu:
             self.bbmodel.cuda()
 

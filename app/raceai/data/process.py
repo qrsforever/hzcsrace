@@ -26,3 +26,13 @@ class PathListDataLoader(BaseDataLoader):
     def __init__(self, tmp_dir, cfg):
         imgpaths = [str(p) for p in cfg.data_source]
         self.dataset = race_load_class(cfg.dataset.class_name)(imgpaths, **cfg.dataset.params)
+
+
+class LocalDataLoader(BaseDataLoader):
+    def __init__(self, cfg):
+        # dataset
+        self.dataset = race_load_class(cfg.dataset.class_name)(cfg.data_source, cfg.dataset.params)
+        self.dataloader = DataLoader(self.dataset, **cfg.sample)
+
+    def get(self):
+        return self.dataloader

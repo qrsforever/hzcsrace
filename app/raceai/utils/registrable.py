@@ -20,7 +20,7 @@ class Registrable(ABC):
         """
         """
 
-    def get_caller(name):
+    def get_runner(name):
         for _, register in Registrable._registry.items():
             if name in register:
                 return register[name][0]

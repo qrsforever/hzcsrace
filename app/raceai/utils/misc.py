@@ -10,7 +10,7 @@ import multiprocessing
 from omegaconf.dictconfig import DictConfig
 from contextlib import contextmanager
 
-DEBUG = True
+DEBUG = False
 
 
 def race_blockprint(func):
