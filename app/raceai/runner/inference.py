@@ -17,14 +17,15 @@ from detectron2.utils.visualizer import Visualizer, ColorMode
 from raceai.utils.registrable import FunctionRegister
 from raceai.utils.error import catch_error
 from raceai.utils.misc import race_load_class
+from raceai.runner.pl import PlClassifier, PlTrainer
 
 
 @catch_error
 @FunctionRegister.register('cls.inference')
 def image_classifier_test(cfg):
     # Data
-    data_loader = race_load_class(cfg.data.class_name)(cfg.runner.cache_dir, cfg.data.params)
-    test_loader = data_loader.get_testloader()
+    data_loader_class = race_load_class(cfg.data.class_name)
+    data_loader = data_loader_class(cfg.data.params).get()
 
     # Model
     test_model = race_load_class(cfg.model.class_name)(cfg.model.params)
@@ -33,10 +34,28 @@ def image_classifier_test(cfg):
     test_model.eval()
     with torch.no_grad():
         results = []
-        for inputs in test_loader:
+        for inputs in data_loader:
             outputs = test_model(inputs)
             results.extend(outputs.argmax(dim=1).cpu().numpy().tolist())
         return {'errno': 0, 'result': results}
+
+
+@catch_error
+@FunctionRegister.register('cls.inference.pl')
+def image_classifier_test_pl(cfg):
+    # Data
+    data_loader_class = race_load_class(cfg.data.class_name)
+    data_loader = data_loader_class(cfg.data.params).get()
+
+    # Model
+    bbmodel = race_load_class(cfg.model.class_name)(cfg.model.params)
+
+    # Test
+    trainer = PlTrainer(False, None, **cfg.trainer)
+    classifer = PlClassifier(trainer, bbmodel, None, None)
+    result = classifer.predict(data_loader)
+    print("################", result)
+    return {'errno': 0, 'result': []}
 
 
 @catch_error

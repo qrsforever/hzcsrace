@@ -16,7 +16,7 @@ def errmsg(code, err):
             'traceback': traceback.format_exc(limit=10)
         }
     }
-    if DEBUG:
+    if DEBUG or code != 0:
         print(msg)
     return msg
 

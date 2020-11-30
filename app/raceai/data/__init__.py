@@ -34,7 +34,7 @@ class RaceDataset(ABC, Dataset):
 
 
 class PredictDirectoryImageRaw(RaceDataset):
-    def __init__(self, img_path):
+    def __init__(self, img_path, cfg):
         self.images = self.data_reader(img_path)
 
     def data_reader(self, path):
@@ -61,14 +61,14 @@ class PredictSingleImageRaw(PredictDirectoryImageRaw):
 
 
 class PredictDirectoryImageDataset(RaceDataset):
-    def __init__(self, img_path, input_size, mean, std):
-        if isinstance(input_size, int):
-            input_size = (input_size, input_size)
+    def __init__(self, img_path, cfg):
+        if isinstance(cfg.input_size, int):
+            input_size = (cfg.input_size, cfg.input_size)
         self.images = self.data_reader(img_path)
         self.itrans = Compose([
                 Resize(input_size),
                 ToTensor(),
-                Normalize(mean=mean, std=std)])
+                Normalize(mean=cfg.mean, std=cfg.std)])
 
     def data_reader(self, path):
         extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.webp')
@@ -118,7 +118,7 @@ class JsonFileDataset(RaceDataset):
                 image_list.append(os.path.join(root, item['image_path']))
                 label_list.append(item['label'])
         return image_list, label_list
-    
+
     def __getitem__(self, index):
         img = Image.open(self.images[index]).convert('RGB')
         if self.augtrans:

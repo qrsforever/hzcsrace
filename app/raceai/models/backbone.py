@@ -31,8 +31,15 @@ class BBM(ABC, nn.Module):
 
 
 class Resnet18(BBM):
-    def tl_model(self, num_classes, weights):
-        model = resnet18(pretrained=False)
+    def tl_model(self, num_classes, weights): # transfer learning
+        pretrained = False
+        if isinstance(weights, bool):
+            pretrained = weights
+        model = resnet18(pretrained)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
-        model.load_state_dict(torch.load(race_prepare_weights(weights)))
+        if isinstance(weights, str):
+            ckpt = torch.load(race_prepare_weights(weights))
+            if 'state_dict' in ckpt:
+                ckpt = ckpt['state_dict']
+            model.load_state_dict(ckpt)
         return model

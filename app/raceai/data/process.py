@@ -10,29 +10,28 @@ from torch.utils.data import DataLoader
 class BaseDataLoader(object):
     dataset = None 
 
-    def get_testloader(self):
-        return DataLoader(self.dataset)
-
-
-class Base64DataLoader(BaseDataLoader):
-    def __init__(self, tmp_dir, cfg):
-        imgpath = os.path.join(tmp_dir, 'b4img.png')
-        with open(imgpath, 'wb') as fout:
-            fout.write(base64.b64decode(cfg.data_source))
-        self.dataset = race_load_class(cfg.dataset.class_name)(imgpath, **cfg.dataset.params)
-
-
-class PathListDataLoader(BaseDataLoader):
-    def __init__(self, tmp_dir, cfg):
-        imgpaths = [str(p) for p in cfg.data_source]
-        self.dataset = race_load_class(cfg.dataset.class_name)(imgpaths, **cfg.dataset.params)
-
-
-class LocalDataLoader(BaseDataLoader):
-    def __init__(self, cfg):
-        # dataset
-        self.dataset = race_load_class(cfg.dataset.class_name)(cfg.data_source, cfg.dataset.params)
+    def __init__(self, filepath, cfg):
+        self.dataset = race_load_class(cfg.dataset.class_name)(filepath, cfg.dataset.params)
         self.dataloader = DataLoader(self.dataset, **cfg.sample)
 
     def get(self):
         return self.dataloader
+
+
+class Base64DataLoader(BaseDataLoader):
+    def __init__(self, cfg):
+        imgpath = os.path.join('/tmp/', 'b4img_%s.png' % cfg.data_source[:6])
+        with open(imgpath, 'wb') as fout:
+            fout.write(base64.b64decode(cfg.data_source))
+        super().__init__(imgpath, cfg)
+
+
+class PathListDataLoader(BaseDataLoader):
+    def __init__(self, cfg):
+        imgpaths = [str(p) for p in cfg.data_source]
+        super().__init__(imgpaths, cfg)
+
+
+class LocalDataLoader(BaseDataLoader):
+    def __init__(self, cfg):
+        super().__init__(cfg.data_source, cfg)

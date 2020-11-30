@@ -26,24 +26,36 @@ def pl_classifier_fit(cfg):
     valid_loader_class = race_load_class(cfg.data.valid.class_name)
     train_loader = train_loader_class(cfg.data.train.params).get()
     valid_loader = valid_loader_class(cfg.data.valid.params).get()
-    if 'test' in cfg.data:
-        test_loader_class = race_load_class(cfg.data.test.class_name)
-        test_loader = test_loader_class(cfg.data.test.params).get()
 
     # Model
     model = race_load_class(cfg.model.class_name)(cfg.model.params)
 
     # Solver
-    trainer = race_load_class(cfg.solver.trainer.class_name)(cfg.solver.trainer.params)
     optimizer_class = race_load_class(cfg.solver.optimizer.class_name)
     scheduler_class = race_load_class(cfg.solver.scheduler.class_name)
     optimizer = optimizer_class(model.parameters(), **cfg.solver.optimizer.params)
     scheduler = scheduler_class(optimizer, **cfg.solver.scheduler.params)
 
-    # runner
+    # Trainer
+    logger = False
+    if 'logger' in cfg.solver.trainer.params:
+        logger_class = race_load_class(cfg.solver.trainer.params.logger.class_name)
+        logger = logger_class(**cfg.solver.trainer.params.logger.params)
+    callbacks = []
+    if 'callbacks' in cfg.solver.trainer.params:
+        for cb in cfg.solver.trainer.params.callbacks:
+            callbacks.append(race_load_class(cb.class_name)(**cb.params))
+    trainer_class = race_load_class(cfg.solver.trainer.class_name)
+    trainer = trainer_class(logger, callbacks, **cfg.solver.trainer.params.general)
+
+    ## runner.fit
     classifier = PlClassifier(trainer, model, optimizer, scheduler)
     classifier.fit(train_loader, valid_loader)
+
+    ## runner.test
     if 'test' in cfg.data:
+        test_loader_class = race_load_class(cfg.data.test.class_name)
+        test_loader = test_loader_class(cfg.data.test.params).get()
         result = classifier.test(test_loader)
     return {'errno': 0, 'result': result}
 

@@ -10,7 +10,7 @@
 
 import json
 import argparse
-import tempfile
+import tempfile # noqa
 
 import raceai.runner # noqa
 
@@ -50,19 +50,17 @@ def _framework_training():
 @catch_error
 @race_timeit(app_logger)
 def _framework_inference():
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        reqjson = json.loads(request.get_data().decode())
+    reqjson = json.loads(request.get_data().decode())
 
-        #### debug
-        # with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
-        #     json.dump(reqjson, fw)
-        ####
-        reqjson['cfg']['runner']['cache_dir'] = tmp_dir
+    #### debug
+    # with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
+    #     json.dump(reqjson, fw)
+    ####
 
-        cfg = OmegaConf.create(reqjson['cfg'])
-        runner = Registrable.get_runner(reqjson['task'])
-        with race_subprocess(runner, cfg) as queue:
-            return queue.get()
+    cfg = OmegaConf.create(reqjson['cfg'])
+    runner = Registrable.get_runner(reqjson['task'])
+    with race_subprocess(runner, cfg) as queue:
+        return queue.get()
 
 
 if __name__ == "__main__":
