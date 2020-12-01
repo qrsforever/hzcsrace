@@ -38,7 +38,7 @@ def pl_classifier_fit(cfg):
 
     # Trainer
     logger = False
-    if 'logger' in cfg.solver.trainer.params:
+    if 'logger' in cfg.solver.trainer.params and isinstance(cfg.solver.trainer['logger'], bool):
         logger_class = race_load_class(cfg.solver.trainer.params.logger.class_name)
         logger = logger_class(**cfg.solver.trainer.params.logger.params)
     callbacks = []

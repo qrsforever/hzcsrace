@@ -4,8 +4,8 @@
 import torch
 import torch.nn as nn
 from abc import ABC, abstractmethod # noqa
-from torchvision.models import resnet18
-from raceai.utils.misc import race_prepare_weights
+from torchvision.models import resnet18, resnet50
+from raceai.utils.misc import race_data
 
 
 class BBM(ABC, nn.Module):
@@ -38,8 +38,17 @@ class Resnet18(BBM):
         model = resnet18(pretrained)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
         if isinstance(weights, str):
-            ckpt = torch.load(race_prepare_weights(weights))
-            if 'state_dict' in ckpt:
-                ckpt = ckpt['state_dict']
-            model.load_state_dict(ckpt)
+            model.load_state_dict(torch.load(race_data(weights)))
+        return model
+
+
+class Resnet50(BBM):
+    def tl_model(self, num_classes, weights): # transfer learning
+        pretrained = False
+        if isinstance(weights, bool):
+            pretrained = weights
+        model = resnet50(pretrained)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        if isinstance(weights, str):
+            model.load_state_dict(torch.load(race_data(weights)))
         return model

@@ -108,19 +108,20 @@ class PlClassifier(pl.LightningModule):
             return list(zip(paths, F.softmax(y_preds, dim=1)))
 
         def predict_epoch_end(self, outputs):
-            result = {}
+            result = {'output':[]}
             for item in outputs:
                 for path, preds in item:
                     fname = os.path.basename(path)
                     probs = preds.cpu().numpy().astype(float).tolist()
-                    result[fname] = probs
-            return result
+                    result['output'].append({'fname': fname, 'probs': probs})
+                    self.log('fname', fname)
+            # self.log_dict(result)
         try:
             _test_step = getattr(self.__class__, 'test_step', None)
             _test_epoch_end = getattr(self.__class__, 'test_epoch_end', None)
             setattr(self.__class__, 'test_step', predict_step)
             setattr(self.__class__, 'test_epoch_end', predict_epoch_end)
-            return self.trainer.test(self, test_loader, verbose=False)
+            return self.trainer.test(self, test_loader, verbose=True)
         except Exception as err:
             raise err
         finally:

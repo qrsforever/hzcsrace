@@ -7,7 +7,7 @@
         "work_dir": "/tmp"
     },
     "data": {
-        "class_name": "raceai.data.process.Base64DataLoader",  
+        "class_name": "raceai.data.process.Base64DataLoader",
         "params": {
             "data_name": "faces",
             "data_source": "",
@@ -18,7 +18,7 @@
         }
     },
     "model": {
-        "class_name": "raceai.models.detectron.MaskRCNN",  
+        "class_name": "raceai.models.detectron.MaskRCNN",
         "params": {
             "weights": "/raceai/data/ckpts/faces_MaskRCNN.pth",
             "roi_heads": {

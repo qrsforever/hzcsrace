@@ -5,12 +5,16 @@ import sys
 import time
 import functools
 import importlib
+import tempfile
 import multiprocessing
 
 from omegaconf.dictconfig import DictConfig
 from contextlib import contextmanager
+from urllib.request import urlretrieve
+from raceai.utils.error import errmsg
 
-DEBUG = False
+DEBUG = True
+TEMPDIR = '/tmp/'
 
 
 def race_blockprint(func):
@@ -54,13 +58,16 @@ def race_convert_dictkeys(x, uppercase=True):
     return x
 
 
-def race_prepare_weights(x):
-    if x.startswith('http://') or x.startswith('ftp://'):
-        raise NotImplementedError('weight schema: http')
+def race_data(x):
+    if x.startswith('http') or x.startswith('ftp'):
+        r = urlretrieve(x, os.path.join(TEMPDIR, os.path.basename(x)))
+        x = r[0]
     elif x.startswith('oss://'):
         raise NotImplementedError('weight schema: oss')
     elif x.startswith('file://'):
         x = x[7:]
+    if DEBUG:
+        print(x)
     return x
 
 
@@ -70,9 +77,12 @@ def race_subprocess(func, *args):
 
     def _target(queue, *args):
         try:
-            queue.put(func(*args))
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                global TEMPDIR
+                TEMPDIR = tmp_dir
+                queue.put(func(*args))
         except Exception as err:
-            queue.put({'errno': 90099, 'result': '{}'.format(err)})
+            queue.put(errmsg(90099, err))
 
     proc = multiprocessing.Process(target=_target, args=(queue, *args))
     proc.start()

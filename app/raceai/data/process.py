@@ -4,11 +4,12 @@
 import os
 import base64
 from raceai.utils.misc import race_load_class
+from raceai.utils.misc import race_data
 from torch.utils.data import DataLoader
 
 
 class BaseDataLoader(object):
-    dataset = None 
+    dataset = None
 
     def __init__(self, filepath, cfg):
         self.dataset = race_load_class(cfg.dataset.class_name)(filepath, cfg.dataset.params)
@@ -28,7 +29,7 @@ class Base64DataLoader(BaseDataLoader):
 
 class PathListDataLoader(BaseDataLoader):
     def __init__(self, cfg):
-        imgpaths = [str(p) for p in cfg.data_source]
+        imgpaths = [race_data(str(p)) for p in cfg.data_source]
         super().__init__(imgpaths, cfg)
 
 

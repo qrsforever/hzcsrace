@@ -6,7 +6,7 @@
         "work_dir": "/tmp"
     },
     "data": {
-        "class_name": "raceai.data.process.PathListDataLoader",  
+        "class_name": "raceai.data.process.PathListDataLoader",
         "params": {
             "data_name": "licenseplate",
             "data_source": [
@@ -19,7 +19,7 @@
         }
     },
     "model": {
-        "class_name": "raceai.models.detectron.Retinanet",  
+        "class_name": "raceai.models.detectron.Retinanet",
         "params": {
             "device": "cpu",
             "weights": "/raceai/data/ckpts/det_licenseplate_retinanet.pth",

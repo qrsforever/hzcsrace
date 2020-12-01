@@ -10,7 +10,6 @@
 
 import json
 import argparse
-import tempfile # noqa
 
 import raceai.runner # noqa
 
