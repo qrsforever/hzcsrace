@@ -54,7 +54,7 @@ def image_classifier_test_pl(cfg):
     trainer = PlTrainer(False, None, **cfg.trainer)
     classifer = PlClassifier(trainer, bbmodel, None, None)
     result = classifer.predict(data_loader)
-    return {'errno': 0, 'result': result}
+    return {'errno': 0, 'result': result[0]['output']}
 
 
 @catch_error

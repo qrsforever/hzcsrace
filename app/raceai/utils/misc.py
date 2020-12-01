@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from urllib.request import urlretrieve
 from raceai.utils.error import errmsg
 
-DEBUG = True
+DEBUG = False
 TEMPDIR = '/tmp/'
 
 

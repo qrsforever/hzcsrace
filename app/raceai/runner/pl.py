@@ -114,8 +114,7 @@ class PlClassifier(pl.LightningModule):
                     fname = os.path.basename(path)
                     probs = preds.cpu().numpy().astype(float).tolist()
                     result['output'].append({'fname': fname, 'probs': probs})
-                    self.log('fname', fname)
-            # self.log_dict(result)
+            self.log_dict(result)
         try:
             _test_step = getattr(self.__class__, 'test_step', None)
             _test_epoch_end = getattr(self.__class__, 'test_epoch_end', None)
