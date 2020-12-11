@@ -11,14 +11,12 @@ import argparse
 import pickle
 import math
 import os
-import json
 import random
-import numpy as np
 import cv2
-import matplotlib.pylab as plt
 
 from os import path as osp
 from PIL import Image, ImageDraw
+from raceai.utils.cv2wapper import CV2Image, CV2Contour
 
 
 CARDS_73_9_SEQS = [
@@ -166,6 +164,7 @@ def generate_card(size, ratio_1, ratio_2, images, outpath, debug=False):
 def generate_sift_features(images, outpath):
     # workaround:  Pickling cv2.KeyPoint causes PicklingError
     import copyreg
+
     def _pickle_keypoints(point):
         return cv2.KeyPoint, (*point.pt, point.size, point.angle,
                               point.response, point.octave, point.class_id)
@@ -175,6 +174,7 @@ def generate_sift_features(images, outpath):
     for imgpath in images:
         key = osp.basename(imgpath).split('.')[0]
         img = cv2.imread(imgpath)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         sift = cv2.xfeatures2d.SIFT_create()
         keypoints, descriptors = sift.detectAndCompute(img, None)
         feature_items[key] = (keypoints, descriptors)
@@ -187,13 +187,13 @@ def calculate_matches(matcher, des1, des2):
     matches = matcher.knnMatch(des1, des2, k=2)
     top_results1 = []
     for m, n in matches:
-        if m.distance < 0.7*n.distance:
+        if m.distance < 0.7 * n.distance:
             top_results1.append([m])
 
     matches = matcher.knnMatch(des2, des1, k=2)
     top_results2 = []
     for m, n in matches:
-        if m.distance < 0.7*n.distance:
+        if m.distance < 0.7 * n.distance:
             top_results2.append([m])
 
     top_results = []
@@ -208,6 +208,44 @@ def calculate_matches(matcher, des1, des2):
             if (match1QueryIndex == match2TrainIndex) and (match1TrainIndex == match2QueryIndex):
                 top_results.append(match1)
     return top_results
+
+
+def spotit_detect(model, img_path, feat_path, threshold=220, max_num=9, csize=800, debug=False):
+    carea = round(csize * csize * 0.01 / max_num)
+
+    with open(feat_path, 'rb') as fr:
+        features = pickle.load(fr)
+
+    img = CV2Image.open(img_path)
+    img = CV2Image.contrast(img)
+    img = CV2Image.resize(img, size=(csize, csize))
+    # img = CV2Image.median_blur(img, ksize=5)
+    # img = CV2Image.gaussian_blur(img, ksize=(11, 11))
+    if debug:
+        img_t = img.copy()
+
+    card_cnt = CV2Contour.grab_by_area(img, threshold=threshold)[0]
+    card = CV2Contour.make_white_background(img, card_cnt)
+    icon_cnts = CV2Contour.grab_by_area(card, threshold=threshold, reverse=True, area=carea)
+
+    results = {}
+    for cnt in icon_cnts[:max_num]:
+        if debug:
+            img_t = CV2Contour.on_draw(img_t, cnt)
+        icon = CV2Contour.make_white_background(card, cnt)
+        icon, rect = CV2Contour.make_out_roi(icon, cnt, square=False)
+        icon = CV2Image.to_gray(icon)
+        kp_1, desc_1 = model.extract(icon)
+        max_score_item = (-1, -1)
+        for img_id, (kp_2, desc_2) in features.items():
+            matches = model.matches(desc_1, desc_2)
+            score = round(100 * (len(matches) / min(len(kp_1), len(kp_2))), 2)
+            if score > max_score_item[0]:
+                max_score_item = (score, int(img_id))
+        results[max_score_item[1]] = {"socre": max_score_item[0], "rect": rect}
+    if debug:
+        CV2Image.show(img_t)
+    return results
 
 
 if __name__ == "__main__":
@@ -231,7 +269,7 @@ if __name__ == "__main__":
     images73 = [osp.join(args.image_root, fname) for fname in images73_files[:73]]
     os.makedirs(args.image_output, exist_ok=True)
     outfiles = []
-    for i, seq in enumerate(cards_seqs):
+    for i, seq in enumerate(CARDS_73_9_SEQS):
         images9 = [images73[j] for j in seq]
         outfiles.append(f'{args.image_output}/{i}.png')
         generate_card(1024, 0.42, 0.2, images9, outfiles[-1])

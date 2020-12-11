@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import os
 import json
 import torch
 import base64 # noqa
@@ -61,7 +62,7 @@ def image_classifier_test_pl(cfg):
 @FunctionRegister.register('det.inference')
 def image_detection_test(cfg):
     # Data
-    data_loader = race_load_class(cfg.data.class_name)(cfg.runner.cache_dir, cfg.data.params)
+    data_loader = race_load_class(cfg.data.class_name)(cfg.cache_dir, cfg.data.params)
     test_loader = data_loader.get_testloader()
 
     # Model
@@ -101,6 +102,26 @@ def image_detection_test(cfg):
     return {'errno': 0, 'result': result}
 
 
+@catch_error
+@FunctionRegister.register('det.features')
+def image_detection_features(cfg):
+    # Data
+    data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
+
+    # Model
+    model = race_load_class(cfg.model.class_name)(cfg.model.params)
+
+    # Trainer
+    trainer = race_load_class(cfg.trainer.class_name)
+    
+    results = {}
+    for img, path in data_loader:
+        fname = os.path.basename(path).split('.')[0]
+        results[fname] = trainer(model, path, **cfg.trainer.params)
+    
+    return {'errno': 0, 'result': results}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -120,7 +141,7 @@ if __name__ == "__main__":
 
     with open(args.config, 'r') as f:
         config = json.load(f)
-        config['cfg']['runner']['cache_dir'] = args.cache_dir
+        config['cfg']['cache_dir'] = args.cache_dir
         runner = FunctionRegister.get_runner(config['task'])
         cfg = OmegaConf.create(config['cfg'])
 

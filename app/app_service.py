@@ -52,8 +52,8 @@ def _framework_inference():
     reqjson = json.loads(request.get_data().decode())
 
     #### debug
-    # with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
-    #     json.dump(reqjson, fw)
+    with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
+        json.dump(reqjson, fw)
     ####
 
     cfg = OmegaConf.create(reqjson['cfg'])

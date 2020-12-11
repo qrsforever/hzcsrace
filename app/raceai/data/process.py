@@ -13,7 +13,10 @@ class BaseDataLoader(object):
 
     def __init__(self, filepath, cfg):
         self.dataset = race_load_class(cfg.dataset.class_name)(filepath, cfg.dataset.params)
-        self.dataloader = DataLoader(self.dataset, **cfg.sample)
+        if 'sample' in cfg:
+            self.dataloader = DataLoader(self.dataset, **cfg.sample)
+        else:
+            self.dataloader = iter(self.dataset)
 
     def get(self):
         return self.dataloader

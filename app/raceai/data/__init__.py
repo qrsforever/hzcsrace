@@ -108,7 +108,7 @@ class PredictDirectoryImageRaw(RaceDataset):
         return image_list
 
     def __getitem__(self, index):
-        return cv2.imread(self.images[index])
+        return cv2.imread(self.images[index], cv2.IMREAD_UNCHANGED), self.images[index]
 
     def __len__(self):
         return len(self.images)

@@ -45,7 +45,7 @@ RUN APT_INSTALL="apt install -y --no-install-recommends" && \
         tzdata iputils-ping jq net-tools libgl1-mesa-glx && \
     pip uninstall enum34 -y && \
     $PIP_INSTALL GPUtil psutil packaging zerorpc \
-        flask flask_cors omegaconf opencv-python \
+        flask flask_cors omegaconf opencv-python opencv-contrib-python \
         onnx onnxruntime \
         torchsummary tensorboard seaborn \
         pyhocon protobuf "jsonnet>=0.10.0"
