@@ -22,6 +22,7 @@ from torchvision.transforms import ( # noqa
         RandomHorizontalFlip)
 
 from raceai.utils.misc import race_load_class
+from raceai.utils.misc import race_data
 
 
 class RaceDataset(ABC, Dataset):
@@ -34,11 +35,11 @@ class RaceDataset(ABC, Dataset):
 
 
 class ClsRaceDataset(RaceDataset):
-    def __init__(self, path, cfg):
+    def __init__(self, source, cfg):
         input_size = cfg.input_size
         if isinstance(input_size, int):
             input_size = (input_size, input_size)
-        self.images, self.labels = self.data_reader(path)
+        self.images, self.labels = self.data_reader(source)
         augtrans = []
         if "imgaugs" in cfg:
             for it in cfg.imgaugs:
@@ -75,10 +76,24 @@ class PredictDirectoryImageDataset(ClsRaceDataset):
 
 
 class PredictListImageDataset(ClsRaceDataset):
-    def data_reader(self, path):
-        if isinstance(path, (list, tuple)):
-            return path, [-1 for _ in path]
-        return [path], [-1]
+    def data_reader(self, sources):
+        if isinstance(sources, str):
+            return [sources], ['-1']
+        images = []
+        labels = []
+        for item in sources:
+            if isinstance(item, str):
+                images.append(race_data(item))
+                labels.append('-1')
+            else:
+                if 'image_path' not in item:
+                    raise ValueError('not found image_path')
+                images.append(race_data(item['image_path']))
+                if 'image_id' in item:
+                    labels.append(item['image_id'])
+                else:
+                    labels.append('-1')
+        return images, labels
 
 
 class JsonFileDataset(ClsRaceDataset):

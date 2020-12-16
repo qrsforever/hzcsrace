@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import os
+import time
 import base64
-from raceai.utils.misc import race_load_class
-from raceai.utils.misc import race_data
 from torch.utils.data import DataLoader
+from raceai.utils.misc import race_load_class
+# from raceai.utils.misc import race_data
 
 
 class BaseDataLoader(object):
@@ -24,7 +25,7 @@ class BaseDataLoader(object):
 
 class Base64DataLoader(BaseDataLoader):
     def __init__(self, cfg):
-        imgpath = os.path.join('/tmp/', 'b4img_%s.png' % cfg.data_source[:6])
+        imgpath = os.path.join('/tmp/', 'b4img_%d.png' % time.time())
         with open(imgpath, 'wb') as fout:
             fout.write(base64.b64decode(cfg.data_source))
         super().__init__(imgpath, cfg)
@@ -32,8 +33,14 @@ class Base64DataLoader(BaseDataLoader):
 
 class PathListDataLoader(BaseDataLoader):
     def __init__(self, cfg):
-        imgpaths = [race_data(str(p)) for p in cfg.data_source]
-        super().__init__(imgpaths, cfg)
+        # imgpaths = []
+        # for item in cfg.data_source:
+        #     if isinstance(item, str):
+        #         pass
+        #     elif isinstance(item, dict):
+        #         pass
+        # imgpaths = [race_data(str(p)) for p in cfg.data_source]
+        super().__init__(cfg.data_source, cfg)
 
 
 class LocalDataLoader(BaseDataLoader):

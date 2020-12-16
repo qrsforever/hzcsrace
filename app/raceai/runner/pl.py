@@ -103,17 +103,16 @@ class PlClassifier(pl.LightningModule):
 
     def predict(self, test_loader):
         def predict_step(self, batch, batch_idx):
-            inputs, _, paths = batch
+            inputs, tags, paths = batch
             y_preds = self(inputs)
-            return list(zip(paths, F.softmax(y_preds, dim=1)))
+            return list(zip(paths, tags, F.softmax(y_preds, dim=1)))
 
         def predict_epoch_end(self, outputs):
             result = {'output':[]}
             for item in outputs:
-                for path, preds in item:
-                    fname = os.path.basename(path)
+                for path, tag, preds in item:
                     probs = preds.cpu().numpy().astype(float).tolist()
-                    result['output'].append({'fname': fname, 'probs': probs})
+                    result['output'].append({'image_path': path, 'image_id': tag, 'probs': probs})
             self.log_dict(result)
         try:
             _test_step = getattr(self.__class__, 'test_step', None)

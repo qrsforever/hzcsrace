@@ -113,12 +113,12 @@ def image_detection_features(cfg):
 
     # Trainer
     trainer = race_load_class(cfg.trainer.class_name)
-    
+
     results = {}
     for img, path in data_loader:
         fname = os.path.basename(path).split('.')[0]
         results[fname] = trainer(model, path, **cfg.trainer.params)
-    
+
     return {'errno': 0, 'result': results}
 
 

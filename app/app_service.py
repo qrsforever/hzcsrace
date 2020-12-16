@@ -10,7 +10,6 @@
 
 import json
 import argparse
-
 import raceai.runner # noqa
 
 from raceai.utils.registrable import Registrable
@@ -19,7 +18,6 @@ from raceai.utils.error import catch_error
 from flask import Flask, request
 from flask_cors import CORS
 from omegaconf import OmegaConf
-
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
