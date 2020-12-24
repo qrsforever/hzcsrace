@@ -6,9 +6,9 @@ import time
 import functools
 import importlib
 import tempfile
-import urllib
 import multiprocessing
 
+from urllib import request, parse
 from omegaconf.dictconfig import DictConfig
 from contextlib import contextmanager
 from raceai.utils.error import errmsg
@@ -60,8 +60,8 @@ def race_convert_dictkeys(x, uppercase=True):
 
 def race_data(x):
     if x.startswith('http') or x.startswith('ftp'):
-        x = urllib.parse.quote(x, safe=':/?-=')
-        r = urllib.request.urlretrieve(x, os.path.join(TEMPDIR, os.path.basename(x)))
+        x = parse.quote(x, safe=':/?-=')
+        r = request.urlretrieve(x, os.path.join(TEMPDIR, os.path.basename(x)))
         x = r[0]
     elif x.startswith('oss://'):
         raise NotImplementedError('weight schema: oss')

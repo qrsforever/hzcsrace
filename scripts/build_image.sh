@@ -41,6 +41,7 @@ __build_image()
     build_flag=0
 
     force=$4
+    dfile=$5
     if [[ x$force == x0 ]]
     then
         items=($(docker images --filter "label=org.label-schema.name=$REPOSITORY" --format "{{.Tag}}"))
@@ -88,7 +89,7 @@ __build_image()
             --build-arg URL=$URL \
             --build-arg COMMIT=$COMMIT \
             --build-arg BRANCH=$BRANCH \
-            --file Dockerfile .
+            --file $dfile .
 
         if [[ $? != 0 ]]
         then
@@ -103,7 +104,14 @@ __build_image()
 
 __main()
 {
-    __build_image "raceai" $MAJOR_RACEAI $MINOR_RACEAI 1
+    dfile="Dockerfile"
+    dname=
+    if [[ x$1 != x ]]
+    then
+        dfile=$1
+        dname="."${dfile#*.}
+    fi
+    __build_image "raceai${dname}" $MAJOR_RACEAI $MINOR_RACEAI 1 $dfile
 }
 
 __main $@
