@@ -111,7 +111,7 @@ class PlClassifier(pl.LightningModule):
             result = {'output':[]}
             for item in outputs:
                 for path, tag, preds in item:
-                    probs = sorted(preds.cpu().numpy().astype(float).tolist())[:10]
+                    probs = preds.cpu().numpy().astype(float).tolist()
                     result['output'].append({'image_path': path, 'image_id': tag, 'probs': probs})
             self.log_dict(result)
         try:
