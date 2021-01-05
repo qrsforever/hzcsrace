@@ -27,7 +27,7 @@ class Base64DataLoader(BaseDataLoader):
     def __init__(self, cfg):
         imgpath = os.path.join('/tmp/', 'b4img_%d.png' % time.time())
         with open(imgpath, 'wb') as fout:
-            fout.write(base64.b64decode(cfg.data_source))
+            fout.write(base64.b64decode(cfg.data_source.split(',')[-1]))
         super().__init__(imgpath, cfg)
 
 

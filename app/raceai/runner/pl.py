@@ -111,8 +111,16 @@ class PlClassifier(pl.LightningModule):
             result = {'output':[]}
             for item in outputs:
                 for path, tag, preds in item:
-                    probs = preds.cpu().numpy().astype(float).tolist()
-                    result['output'].append({'image_path': path, 'image_id': tag, 'probs': probs})
+                    probs = preds.cpu()
+                    probs_sorted = probs.sort(descending=True)
+                    result['output'].append({
+                        'image_path': path,
+                        'image_id': tag,
+                        'probs': probs.numpy().astype(float).tolist(),
+                        'probs_sorted': {
+                            'values': probs_sorted.values.numpy().astype(float).tolist(),
+                            'indices': probs_sorted.indices.numpy().astype(int).tolist()
+                        }})
             self.log_dict(result)
         try:
             _test_step = getattr(self.__class__, 'test_step', None)
