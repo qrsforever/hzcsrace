@@ -12,6 +12,7 @@ import PIL.Image as Image # noqa
 import matplotlib.pyplot as plt # noqa
 
 from omegaconf import OmegaConf
+from torchvision import transforms
 from detectron2.engine import DefaultPredictor
 from detectron2.utils.visualizer import Visualizer, ColorMode
 
@@ -119,6 +120,41 @@ def image_detection_features(cfg):
         fname = os.path.basename(path).split('.')[0]
         results[fname] = trainer(model, path, **cfg.trainer.params)
 
+    return {'errno': 0, 'result': results}
+
+
+@catch_error
+@FunctionRegister.register('nst.inference')
+def neural_style_transfer(cfg):
+    # Data
+    data_loader_class = race_load_class(cfg.data.class_name)
+    data_loader = data_loader_class(cfg.data.params).get()
+
+    # Model
+    style_model = race_load_class(cfg.model.class_name)(cfg.model.params)
+
+    device = torch.device("cuda")
+    content_transform = transforms.Compose([
+	transforms.ToTensor(),
+        transforms.Lambda(lambda x: x.mul(255))
+        ])
+
+    content_image = content_transform(content_image)
+    content_image = content_image.unsqueeze(0).to(device)
+
+#     with torch.no_grad():
+# 	state_dict = torch.load(os.path.join(SYTLE_WEIGHT_PATH, 'mosaic.pth'))
+# 	for k in list(state_dict.keys()):
+# 	    if re.search(r'in\d+\.running_(mean|var)$', k):
+# 		del state_dict[k]
+# 	style_model.load_state_dict(state_dict)
+# 	style_model.to(device)
+# 	output = style_model(content_image).cpu()
+# 	
+#     img = output[0].clone().clamp(0, 255).numpy()
+#     img = img.transpose(1, 2, 0).astype("uint8")
+#     img = Image.fromarray(img)
+ 
     return {'errno': 0, 'result': results}
 
 
