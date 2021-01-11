@@ -133,29 +133,26 @@ def neural_style_transfer(cfg):
     # Model
     style_model = race_load_class(cfg.model.class_name)(cfg.model.params)
 
-    device = torch.device("cuda")
     content_transform = transforms.Compose([
-	transforms.ToTensor(),
+        transforms.ToTensor(),
         transforms.Lambda(lambda x: x.mul(255))
         ])
 
-    content_image = content_transform(content_image)
-    content_image = content_image.unsqueeze(0).to(device)
-
-#     with torch.no_grad():
-# 	state_dict = torch.load(os.path.join(SYTLE_WEIGHT_PATH, 'mosaic.pth'))
-# 	for k in list(state_dict.keys()):
-# 	    if re.search(r'in\d+\.running_(mean|var)$', k):
-# 		del state_dict[k]
-# 	style_model.load_state_dict(state_dict)
-# 	style_model.to(device)
-# 	output = style_model(content_image).cpu()
-# 	
-#     img = output[0].clone().clamp(0, 255).numpy()
-#     img = img.transpose(1, 2, 0).astype("uint8")
-#     img = Image.fromarray(img)
- 
-    return {'errno': 0, 'result': results}
+    style_model.eval()
+    with torch.no_grad():
+        results = []
+        img, _ = next(data_loader)
+        img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        img = content_transform(img)
+        out = style_model(img.unsqueeze(0)).cpu()
+        out = out[0].clone().clamp(0, 255).numpy()
+        out = out.transpose(1, 2, 0).astype("uint8")
+        out = Image.fromarray(out)
+        bio = io.BytesIO()
+        out.save(bio, "PNG")
+        bio.seek(0)
+        return {'errno': 0, 'result': {
+            'b64img': base64.b64encode(bio.read()).decode()}}
 
 
 if __name__ == "__main__":

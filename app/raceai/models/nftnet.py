@@ -8,6 +8,7 @@
 # @date 2021-01-08 22:57
 
 import torch
+import re
 
 
 class ConvBlock(torch.nn.Module):
@@ -42,8 +43,9 @@ class ResidualBlock(torch.nn.Module):
         out = out + residual
         return out
 
+
 class TransformerNet(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, cuda=True):
         super(TransformerNet, self).__init__()
         # Initial convolution layers
         self.conv1 = ConvBlock(3, 32, kernel_size=9, stride=1)
@@ -66,8 +68,11 @@ class TransformerNet(torch.nn.Module):
         self.deconv3 = ConvBlock(32, 3, kernel_size=9, stride=1)
         # Non-linearities
         self.relu = torch.nn.ReLU()
+        self.cuda = cuda
 
     def forward(self, X):
+        if self.cuda:
+            X = X.to('cuda')
         y = self.relu(self.in1(self.conv1(X)))
         y = self.relu(self.in2(self.conv2(y)))
         y = self.relu(self.in3(self.conv3(y)))
@@ -80,3 +85,14 @@ class TransformerNet(torch.nn.Module):
         y = self.relu(self.in5(self.deconv2(y)))
         y = self.deconv3(y)
         return y
+
+
+def NFTNet(cfg):
+    state_dict = torch.load(cfg.weights)
+    for k in list(state_dict.keys()):
+        if re.search(r'in\d+\.running_(mean|var)$', k):
+            del state_dict[k]
+    model = TransformerNet()
+    model.load_state_dict(state_dict)
+    model.to(cfg.device)
+    return model
