@@ -80,6 +80,12 @@ finetune.add_argument('-fs', '--finetune_save', action='store_true',
                       help='enable saving finetune checkpoint')
 d = parser.get_default
 
+# def tensor2bgr(img_tensor):
+#     output_img = unnormalize(img_tensor.clone(), [0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
+#     output_img = output_img.squeeze().permute(1, 2, 0).cpu().numpy()
+#     output_img = np.round(output_img[:, :, ::-1] * 255).astype('uint8')
+# 
+#     return output_img
 
 class FaceSwapping(VideoProcessBase):
     def __init__(self, resolution=d('resolution'), crop_scale=d('crop_scale'), gpus=d('gpus'),
@@ -333,6 +339,9 @@ class FaceSwapping(VideoProcessBase):
 
             # Final result
             result_tensor = blend_tensor * soft_tgt_mask + tgt_frame * (1 - soft_tgt_mask)
+
+            cv2.imwrite('blend_bgr.png', tensor2bgr(blend_tensor)) # TODO
+            cv2.imwrite('result_bgr.png', tensor2bgr(result_tensor)) # TODO
 
             # Write output
             if self.verbose == 0:
