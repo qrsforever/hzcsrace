@@ -31,6 +31,7 @@ from fsgan.utils.landmarks_utils import LandmarksHeatMapEncoder, smooth_landmark
 from fsgan.utils.seg_utils import encode_binary_mask, remove_inner_mouth
 from fsgan.utils.batch import main as batch
 
+WEIGHT_PATH = os.getenv('WEIGHT_PATH', '../weights')
 
 base_parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, add_help=False)
 
@@ -51,7 +52,7 @@ general.add_argument('-ec', '--encoder_codec', default='avc1', metavar='STR',
                      help='encoder codec code')
 
 detection = base_parser.add_argument_group('detection')
-detection.add_argument('-dm', '--detection_model', metavar='PATH', default='../weights/WIDERFace_DSFD_RES152.pth',
+detection.add_argument('-dm', '--detection_model', metavar='PATH', default=f'{WEIGHT_PATH}/WIDERFace_DSFD_RES152.pth',
                        help='path to face detection model')
 detection.add_argument('-db', '--det_batch_size', default=8, type=int, metavar='N',
                        help='detection batch size')
@@ -77,7 +78,7 @@ sequences.add_argument('-we', '--write_empty', action='store_true',
                        help='write empty sequence lists to file')
 
 pose = base_parser.add_argument_group('pose')
-pose.add_argument('-pm', '--pose_model', default='../weights/hopenet_robust_alpha1.pth', metavar='PATH',
+pose.add_argument('-pm', '--pose_model', default=f'{WEIGHT_PATH}/hopenet_robust_alpha1.pth', metavar='PATH',
                        help='path to face pose model file')
 pose.add_argument('-pb', '--pose_batch_size', default=128, type=int, metavar='N',
                        help='pose batch size')
@@ -91,7 +92,7 @@ pose.add_argument('-spo', '--smooth_poses', default=5, type=int, metavar='N',
                   help='poses temporal smoothing kernel size')
 
 landmarks = base_parser.add_argument_group('landmarks')
-landmarks.add_argument('-lm', '--lms_model', default='../weights/hr18_wflw_landmarks.pth', metavar='PATH',
+landmarks.add_argument('-lm', '--lms_model', default=f'{WEIGHT_PATH}/hr18_wflw_landmarks.pth', metavar='PATH',
                        help='landmarks model')
 landmarks.add_argument('-lb', '--lms_batch_size', default=64, type=int, metavar='N',
                        help='landmarks batch size')
@@ -103,7 +104,7 @@ landmarks.add_argument('-sl', '--smooth_landmarks', default=7, type=int, metavar
                        help='landmarks temporal smoothing kernel size')
 
 segmentation = base_parser.add_argument_group('segmentation')
-segmentation.add_argument('-sm', '--seg_model', default='../weights/celeba_unet_256_1_2_segmentation_v2.pth',
+segmentation.add_argument('-sm', '--seg_model', default=f'{WEIGHT_PATH}/celeba_unet_256_1_2_segmentation_v2.pth',
                           metavar='PATH', help='segmentation model')
 segmentation.add_argument('-sb', '--seg_batch_size', default=32, type=int, metavar='N',
                           help='segmentation batch size')

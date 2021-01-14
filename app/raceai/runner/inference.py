@@ -124,6 +124,12 @@ def image_detection_features(cfg):
 
 
 @catch_error
+@FunctionRegister.register('gan.faceswap')
+def image_face_swap_gan(cfg):
+    pass
+
+
+@catch_error
 @FunctionRegister.register('nst.inference')
 def neural_style_transfer(cfg):
     # Data

@@ -35,6 +35,8 @@ from fsgan.datasets.appearance_map import AppearanceMapDataset
 from fsgan.utils.video_renderer import VideoRenderer
 from fsgan.utils.batch import main as batch
 
+WEIGHT_PATH = os.getenv('WEIGHT_PATH', '../weights')
+
 
 parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter,
                                  parents=[base_parser])
@@ -51,12 +53,12 @@ parser.add_argument('-st', '--select_target', default='longest', metavar='STR',
 parser.add_argument('-b', '--batch_size', default=8, type=int, metavar='N',
                     help='mini-batch size')
 parser.add_argument('-rm', '--reenactment_model', metavar='PATH',
-                    default='../weights/nfv_msrunet_256_1_2_reenactment_v2.1.pth', help='reenactment model')
-parser.add_argument('-cm', '--completion_model', default='../weights/ijbc_msrunet_256_1_2_inpainting_v2.pth',
+                    default=f'{WEIGHT_PATH}/nfv_msrunet_256_1_2_reenactment_v2.1.pth', help='reenactment model')
+parser.add_argument('-cm', '--completion_model', default=f'{WEIGHT_PATH}/ijbc_msrunet_256_1_2_inpainting_v2.pth',
                     metavar='PATH', help='completion model')
-parser.add_argument('-bm', '--blending_model', default='../weights/ijbc_msrunet_256_1_2_blending_v2.pth',
+parser.add_argument('-bm', '--blending_model', default=f'{WEIGHT_PATH}/ijbc_msrunet_256_1_2_blending_v2.pth',
                     metavar='PATH', help='blending model')
-parser.add_argument('-ci', '--criterion_id', default="vgg_loss.VGGLoss('../weights/vggface2_vgg19_256_1_2_id.pth')",
+parser.add_argument('-ci', '--criterion_id', default=f"vgg_loss.VGGLoss('{WEIGHT_PATH}/vggface2_vgg19_256_1_2_id.pth')",
                     metavar='OBJ', help='id criterion object')
 parser.add_argument('-mr', '--min_radius', default=2.0, type=float, metavar='F',
                     help='minimum distance between points in the appearance map')
@@ -80,12 +82,6 @@ finetune.add_argument('-fs', '--finetune_save', action='store_true',
                       help='enable saving finetune checkpoint')
 d = parser.get_default
 
-# def tensor2bgr(img_tensor):
-#     output_img = unnormalize(img_tensor.clone(), [0.5, 0.5, 0.5], [0.5, 0.5, 0.5])
-#     output_img = output_img.squeeze().permute(1, 2, 0).cpu().numpy()
-#     output_img = np.round(output_img[:, :, ::-1] * 255).astype('uint8')
-# 
-#     return output_img
 
 class FaceSwapping(VideoProcessBase):
     def __init__(self, resolution=d('resolution'), crop_scale=d('crop_scale'), gpus=d('gpus'),
@@ -340,9 +336,6 @@ class FaceSwapping(VideoProcessBase):
             # Final result
             result_tensor = blend_tensor * soft_tgt_mask + tgt_frame * (1 - soft_tgt_mask)
 
-            cv2.imwrite('blend_bgr.png', tensor2bgr(blend_tensor)) # TODO
-            cv2.imwrite('result_bgr.png', tensor2bgr(result_tensor)) # TODO
-
             # Write output
             if self.verbose == 0:
                 self.video_renderer.write(result_tensor)
@@ -367,6 +360,15 @@ class FaceSwapping(VideoProcessBase):
         # Finalize video and wait for the video writer to finish writing
         self.video_renderer.finalize()
         self.video_renderer.wait_until_finished()
+
+        # TODO
+        videoCapture = cv2.VideoCapture(output_path)
+        success, frame = videoCapture.read()
+        i = 0
+        while success:
+            cv2.imwrite(f'/raceai/data/frame{i}.png', frame)
+            success, frame = videoCapture.read()
+            i += 1
 
 
 class FaceSwappingRenderer(VideoRenderer):
