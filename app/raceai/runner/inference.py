@@ -8,6 +8,7 @@ import torch
 import base64 # noqa
 import io # noqa
 import cv2 # noqa
+import shutil
 import PIL.Image as Image # noqa
 import matplotlib.pyplot as plt # noqa
 
@@ -126,7 +127,26 @@ def image_detection_features(cfg):
 @catch_error
 @FunctionRegister.register('gan.faceswap')
 def image_face_swap_gan(cfg):
-    pass
+    # Data
+    data_loader_class = race_load_class(cfg.data.class_name)
+    data_loader = data_loader_class(cfg.data.params).get()
+
+    # Model
+    output_path = race_load_class(cfg.model.class_name)(**cfg.model.params)
+
+    # Get first frame
+    b64data = ''
+    videoCapture = cv2.VideoCapture(output_path)
+    success, frame = videoCapture.read()
+    if success:
+        image = Image.fromarray(frame).convert('RGB')
+        bio = io.BytesIO()
+        image.save(bio, "PNG")
+        bio.seek(0)
+        b64data = base64.b64encode(bio.read()).decode()
+    shutil.rmtree(os.path.dirname(output_path))
+    return {'errno': 0, 'result': {
+        'b64img': b64data}}
 
 
 @catch_error

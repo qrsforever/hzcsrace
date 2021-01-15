@@ -362,13 +362,14 @@ class FaceSwapping(VideoProcessBase):
         self.video_renderer.wait_until_finished()
 
         # TODO
-        videoCapture = cv2.VideoCapture(output_path)
-        success, frame = videoCapture.read()
-        i = 0
-        while success:
-            cv2.imwrite(f'/raceai/data/frame{i}.png', frame)
-            success, frame = videoCapture.read()
-            i += 1
+        # videoCapture = cv2.VideoCapture(output_path)
+        # success, frame = videoCapture.read()
+        # i = 0
+        # while success:
+        #     cv2.imwrite(f'/raceai/data/frame{i}.png', frame)
+        #     success, frame = videoCapture.read()
+        #     i += 1
+        return output_path
 
 
 class FaceSwappingRenderer(VideoRenderer):
@@ -506,7 +507,7 @@ def main(source, target, output=None, select_source=d('select_source'), select_t
         blending_model=blending_model, criterion_id=criterion_id, min_radius=min_radius, output_crop=output_crop,
         renderer_process=renderer_process)
     if len(source) == 1 and len(target) == 1 and os.path.isfile(source[0]) and os.path.isfile(target[0]):
-        face_swapping(source[0], target[0], output, select_source, select_target)
+        return face_swapping(source[0], target[0], output, select_source, select_target)
     else:
         batch(source, target, output, face_swapping, postfix='.mp4', skip_existing=True)
 

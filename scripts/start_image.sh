@@ -27,6 +27,7 @@ __start_raceai()
 {
     docker run -d${arg} --runtime nvidia --name ${PROJECT} \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
+        --env WEIGHT_PATH=/raceai/data/ckpts/fsgan \
         --network host \
         --volume /raceai/data:/raceai/data \
         --volume $TOP_DIR/app:/raceai/codes/app \
