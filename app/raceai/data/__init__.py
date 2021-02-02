@@ -34,6 +34,26 @@ class RaceDataset(ABC, Dataset):
         """
 
 
+class RawRaceDataset(RaceDataset):
+    def __init__(self, source, cfg):
+        self.images = self.data_reader(source)
+
+    def data_reader(self, sources):
+        if isinstance(sources, str):
+            return [race_data(sources)]
+        images = []
+        for item in sources:
+            if isinstance(item, str):
+                images.append(race_data(item))
+        return images
+
+    def __getitem__(self, index):
+        return self.images[index]
+
+    def __len__(self):
+        return len(self.images)
+
+
 class ClsRaceDataset(RaceDataset):
     def __init__(self, source, cfg):
         input_size = cfg.input_size

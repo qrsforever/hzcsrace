@@ -128,8 +128,8 @@ def image_detection_features(cfg):
 @FunctionRegister.register('gan.faceswap')
 def image_face_swap_gan(cfg):
     # Data
-    data_loader_class = race_load_class(cfg.data.class_name)
-    data_loader = data_loader_class(cfg.data.params).get()
+    # data_loader_class = race_load_class(cfg.data.class_name)
+    # data_loader = data_loader_class(cfg.data.params).get()
 
     # Model
     output_path = race_load_class(cfg.model.class_name)(**cfg.model.params)
@@ -161,12 +161,10 @@ def neural_style_transfer(cfg):
 
     content_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Lambda(lambda x: x.mul(255))
-        ])
+        transforms.Lambda(lambda x: x.mul(255))])
 
     style_model.eval()
     with torch.no_grad():
-        results = []
         img, _ = next(data_loader)
         img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         img = content_transform(img)

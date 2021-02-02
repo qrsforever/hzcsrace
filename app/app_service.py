@@ -11,6 +11,7 @@
 import json
 import argparse
 import raceai.runner # noqa
+import zmq
 
 from raceai.utils.registrable import Registrable
 from raceai.utils.misc import race_timeit, race_subprocess
@@ -24,6 +25,9 @@ CORS(app, supports_credentials=True)
 
 app.debug = True
 app_logger = app.logger.info
+
+context = zmq.Context()
+zmqpub = context.socket(zmq.PUB)
 
 
 @app.route('/raceai/framework/training', methods=['POST'], endpoint='training')
@@ -54,6 +58,10 @@ def _framework_inference():
         json.dump(reqjson, fw)
     ####
 
+    if reqjson['task'].startswith('zmq'):
+        zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(reqjson['cfg'], separators=(',',':'))))
+        return json.dumps({'errno': 0})
+
     cfg = OmegaConf.create(reqjson['cfg'])
     runner = Registrable.get_runner(reqjson['task'])
     with race_subprocess(runner, cfg) as queue:
@@ -83,6 +91,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    zmqpub.bind("tcp://*:5555")
     try:
         app.run(host=args.host, port=args.port, debug=bool(args.debug))
     finally:
