@@ -51,7 +51,7 @@ RUN PIP_INSTALL="pip install -U --no-cache-dir --retries 20 --timeout 120 \
     $PIP_INSTALL GPUtil psutil packaging zerorpc flask flask_cors omegaconf \
     onnx onnxruntime yacs ffmpeg-python face_alignment \
     torchsummary tensorboard seaborn \
-    pyhocon protobuf "jsonnet>=0.10.0" && \
+    pyhocon protobuf redis "jsonnet>=0.10.0" && \
     pip uninstall -y opencv-python
 
 # install opencv
@@ -109,3 +109,7 @@ ENV PYTHONPATH=/raceai/codes/projects/yolov5:$PYTHONPATH
 #     apt-get clean && \
 #     apt-get autoremove && \
 #     rm -rf /var/lib/apt/lists/* /tmp/* ~/*
+
+SHELL ["/bin/bash"]               
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

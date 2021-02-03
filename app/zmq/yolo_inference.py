@@ -10,28 +10,34 @@
 import argparse
 import cv2
 import torch
-import torch.backends.cudnn as cudnn
-import numpy as np
 from omegaconf import OmegaConf
-from numpy import random
 
 from yolov5.models.experimental import attempt_load
 from yolov5.utils.torch_utils import select_device
 from yolov5.utils.datasets import LoadImages
-from yolov5.utils.general import check_img_size, non_max_suppression # noqa
-from raceai.utils.misc import race_load_class
+from yolov5.utils.general import check_img_size, non_max_suppression
+from yolov5.utils.general import scale_coords
+from yolov5.utils.plots import plot_one_box
+
+from raceai.utils.misc import race_load_class, race_report_result
+from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)
 
 import time # noqa
 import zmq
 
+view_debug = False
+race_set_loglevel('info')
+race_set_logfile('/tmp/raceai-yolo.log')
+
 context = zmq.Context()
+topic = 'zmq.yolo.inference'
 zmqsub = context.socket(zmq.SUB)
 zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
-zmqsub.subscribe('zmq.yolo.inference')
+zmqsub.subscribe(topic)
 
 
 def detect(opt):
-    print('Loading weight [%s]...' % opt.weights)
+    Logger.info('loading weight [%s]...' % opt.weights)
     device = select_device(opt.device)
     half = device.type != 'cpu'
     t0 = time.time()
@@ -40,36 +46,58 @@ def detect(opt):
     if half:
         model.half()
     t1 = time.time()
-    print('Loading finish [%.2fs]' % (t1 - t0))
+    Logger.info('loading finish [%.2fs]' % (t1 - t0))
     img = torch.zeros((1, 3, imgsz, imgsz), device=device)
-    _ = model(img.half() if half else img) if device.type != 'cpu' else None  # noqa
+    model(img.half() if half else img) if device.type != 'cpu' else None
     t2 = time.time()
-    print('Use time: [%.2fs]' % (t2 - t1))
+    Logger.info('time consuming: [%.2fs]' % (t2 - t1))
     while True:
         try:
             cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
             cfg = OmegaConf.create(cfg)
+            Logger.info(cfg)
+            if 'pigeon' not in cfg:
+                continue
+            resdata = {'pigeon': dict(cfg.pigeon), 'task': topic, 'errno': 0, 'result': []}
             t3 = time.time()
             data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
             for source in data_loader:
                 dataset = LoadImages(source, img_size=imgsz)
-                path, img, im0s, vid_cap = next(iter(dataset))
-                print(path)
+                path, img, im0, _ = next(iter(dataset))
+                Logger.info(path)
+                resitem = {'image_path': path, 'faces_det':[]}
                 img = torch.from_numpy(img).to(device)
-                img = img.half() if half else img.float() 
+                img = img.half() if half else img.float()
                 img /= 255.0
                 if img.ndimension() == 3:
                     img = img.unsqueeze(0)
                 pred = model(img, augment=opt.augment)[0]
                 pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres)
-                print(pred)
+                for i, det in enumerate(pred):
+                    if len(det) == 0:
+                        continue
+                    det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+                    for *xyxy, conf, _ in reversed(det):
+                        resitem['faces_det'].append({
+                            'conf': '%.3f' % conf,
+                            'xyxy': [int(x) for x in xyxy]})
+                        if view_debug:
+                            plot_one_box(xyxy, im0, label='%.3f' % conf, line_thickness=1)
+                            cv2.imwrite(f'/raceai/data/{i}.png', im0)
+                resdata['result'].append(resitem)
+            Logger.info(resdata)
+            race_report_result(topic, resdata)
         except Exception as err:
-            print(err)
-        print('Time: [%.2f]s' % (time.time() - t3))
-        time.sleep(1)
+            resdata['errno'] = -1 # todo
+            race_report_result(topic, resdata)
+            Logger.error(err)
+        Logger.info('time consuming: [%.2f]s' % (time.time() - t3))
+        time.sleep(0.01)
 
 
 if __name__ == '__main__':
+    Logger.info('start yolo main')
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', type=str, default='/raceai/data/ckpts/yolov5/yolov5l.pt', help='model.pt path(s)')
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
@@ -80,4 +108,6 @@ if __name__ == '__main__':
     opt = parser.parse_args()
 
     with torch.no_grad():
+        Logger.info('start yolo detect')
         detect(opt)
+        Logger.info('never run here')

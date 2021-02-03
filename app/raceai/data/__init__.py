@@ -36,16 +36,28 @@ class RaceDataset(ABC, Dataset):
 
 class RawRaceDataset(RaceDataset):
     def __init__(self, source, cfg):
+        if 'data_prefix' in cfg:
+            self.data_prefix = cfg.data_prefix
+        else:
+            self.data_prefix = ''
         self.images = self.data_reader(source)
 
     def data_reader(self, sources):
         if isinstance(sources, str):
             return [race_data(sources)]
-        images = []
-        for item in sources:
-            if isinstance(item, str):
-                images.append(race_data(item))
-        return images
+        elif isinstance(sources, (tuple, list)):
+            images = []
+            for item in sources:
+                if isinstance(item, str):
+                    if self.data_prefix:
+                        path = os.path.join(self.data_prefix, item)
+                    else:
+                        path = item
+                    images.append(race_data(path))
+                else:
+                    assert RuntimeError(type(item))
+            return images
+        assert RuntimeError(type(sources))
 
     def __getitem__(self, index):
         return self.images[index]
@@ -101,18 +113,23 @@ class PredictListImageDataset(ClsRaceDataset):
             return [sources], ['-1']
         images = []
         labels = []
-        for item in sources:
-            if isinstance(item, str):
-                images.append(race_data(item))
-                labels.append('-1')
-            else:
-                if 'image_path' not in item:
-                    raise ValueError('not found image_path')
-                images.append(race_data(item['image_path']))
-                if 'image_id' in item:
-                    labels.append(item['image_id'])
-                else:
+        if isinstance(sources, (list, tuple)):
+            for item in sources:
+                if isinstance(item, str):
+                    images.append(race_data(item))
                     labels.append('-1')
+                elif isinstance(item, dict):
+                    if 'image_path' not in item:
+                        raise ValueError('not found image_path')
+                    images.append(race_data(item['image_path']))
+                    if 'image_id' in item:
+                        labels.append(item['image_id'])
+                    else:
+                        labels.append('-1')
+                else:
+                    assert RuntimeError(type(item))
+        else:
+            assert RuntimeError(type(sources))
         return images, labels
 
 

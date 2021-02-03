@@ -12,6 +12,7 @@ import json
 import argparse
 import raceai.runner # noqa
 import zmq
+import redis
 
 from raceai.utils.registrable import Registrable
 from raceai.utils.misc import race_timeit, race_subprocess
@@ -28,6 +29,7 @@ app_logger = app.logger.info
 
 context = zmq.Context()
 zmqpub = context.socket(zmq.PUB)
+g_redis = None
 
 
 @app.route('/raceai/framework/training', methods=['POST'], endpoint='training')
@@ -68,6 +70,21 @@ def _framework_inference():
         return queue.get()
 
 
+@app.route('/raceai/private/pushmsg', methods=['POST'], endpoint='pushmsg')
+@catch_error
+@race_timeit(app_logger)
+def _framework_message_push():
+    try:
+        if g_redis:
+            key = request.args.get("key", default='unknown')
+            g_redis.lpush(key, request.get_data().decode())
+            g_redis.expire(key, 432000) # 5 days
+    except Exception as err:
+        app_logger(err)
+        return "-1"
+    return "0"
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -88,10 +105,34 @@ if __name__ == "__main__":
             type=int,
             dest='port',
             help="port to run raceai service")
+    parser.add_argument(
+            '--redis_addr',
+            default=None,
+            type=str,
+            dest='redis_addr',
+            help="redis address")
+    parser.add_argument(
+            '--redis_port',
+            default=10090,
+            type=int,
+            dest='redis_port',
+            help="redis port")
+    parser.add_argument(
+            '--redis_passwd',
+            default='123456',
+            type=str,
+            dest='redis_passwd',
+            help="redis passwd")
 
     args = parser.parse_args()
 
-    zmqpub.bind("tcp://*:5555")
+    try:
+        zmqpub.bind("tcp://*:5555")
+        g_redis = redis.StrictRedis(args.redis_addr,
+                port=args.redis_port,
+                password=args.redis_passwd)
+    except Exception as err:
+        app_logger('{}'.format(err))
     try:
         app.run(host=args.host, port=args.port, debug=bool(args.debug))
     finally:

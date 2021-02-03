@@ -4,6 +4,7 @@
 import os
 import time
 import base64
+import omegaconf
 from torch.utils.data import DataLoader
 from raceai.utils.misc import race_load_class
 # from raceai.utils.misc import race_data
@@ -12,8 +13,12 @@ from raceai.utils.misc import race_load_class
 class BaseDataLoader(object):
     dataset = None
 
-    def __init__(self, filepath, cfg):
-        self.dataset = race_load_class(cfg.dataset.class_name)(filepath, cfg.dataset.params)
+    def __init__(self, sources, cfg):
+        if isinstance(sources, omegaconf.ListConfig):
+            sources = list(sources)
+        elif isinstance(sources, omegaconf.DictConfig):
+            sources = dict(sources)
+        self.dataset = race_load_class(cfg.dataset.class_name)(sources, cfg.dataset.params)
         if 'sample' in cfg:
             self.dataloader = DataLoader(self.dataset, **cfg.sample)
         else:

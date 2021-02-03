@@ -3,10 +3,12 @@
 import os
 import sys
 import time
+import json
 import functools
 import importlib
 import tempfile
 import multiprocessing
+import requests
 
 from urllib import request, parse
 from omegaconf.dictconfig import DictConfig
@@ -70,6 +72,13 @@ def race_data(x):
     if DEBUG:
         print(x)
     return x
+
+
+def race_report_result(key, data):
+    api = 'http://{}/raceai/private/pushmsg?key={}.result'.format('0.0.0.0:9119', key)
+    if isinstance(data, str):
+        data = json.loads(data)
+    requests.post(api, json=data)
 
 
 @contextmanager
