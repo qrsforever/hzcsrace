@@ -61,7 +61,10 @@ def _framework_inference():
     ####
 
     if reqjson['task'].startswith('zmq'):
-        zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(reqjson['cfg'], separators=(',',':'))))
+        cfg = reqjson['cfg']
+        if isinstance(cfg, str):
+            cfg = json.loads(cfg)
+        zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(cfg, separators=(',',':'))))
         return json.dumps({'errno': 0})
 
     cfg = OmegaConf.create(reqjson['cfg'])
@@ -77,12 +80,30 @@ def _framework_message_push():
     try:
         if g_redis:
             key = request.args.get("key", default='unknown')
+            app_logger(key)
             g_redis.lpush(key, request.get_data().decode())
             g_redis.expire(key, 432000) # 5 days
     except Exception as err:
         app_logger(err)
         return "-1"
     return "0"
+
+
+@app.route('/raceai/private/popmsg', methods=['GET'])
+def _framework_message_pop():
+    response = []
+    try:
+        if g_redis:
+            key = request.args.get("key", default='unknown')
+            while True:
+                item = g_redis.rpop(key)
+                if item is None:
+                    break
+                response.append(json.loads(item.decode()))
+    except Exception as err:
+        app_logger(err)
+    finally:
+        return json.dumps(response)
 
 
 if __name__ == "__main__":

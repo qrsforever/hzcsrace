@@ -75,7 +75,7 @@ def race_data(x):
 
 
 def race_report_result(key, data):
-    api = 'http://{}/raceai/private/pushmsg?key={}.result'.format('0.0.0.0:9119', key)
+    api = 'http://{}/raceai/private/pushmsg?key={}'.format('0.0.0.0:9119', key)
     if isinstance(data, str):
         data = json.loads(data)
     requests.post(api, json=data)

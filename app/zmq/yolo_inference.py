@@ -7,6 +7,7 @@
 # @version 1.0
 # @date 2021-02-02 18:23
 
+import traceback
 import argparse
 import cv2
 import torch
@@ -58,6 +59,9 @@ def detect(opt):
             Logger.info(cfg)
             if 'pigeon' not in cfg:
                 continue
+            msgkey = f'{topic}.result'
+            if 'msgkey' in cfg.pigeon:
+                msgkey = cfg.pigeon.msgkey
             resdata = {'pigeon': dict(cfg.pigeon), 'task': topic, 'errno': 0, 'result': []}
             t3 = time.time()
             data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
@@ -86,11 +90,12 @@ def detect(opt):
                             cv2.imwrite(f'/raceai/data/{i}.png', im0)
                 resdata['result'].append(resitem)
             Logger.info(resdata)
-            race_report_result(topic, resdata)
-        except Exception as err:
+            race_report_result(msgkey, resdata)
+        except Exception:
             resdata['errno'] = -1 # todo
-            race_report_result(topic, resdata)
-            Logger.error(err)
+            resdata['traceback'] = traceback.format_exc()
+            race_report_result(msgkey, resdata)
+            Logger.error(resdata)
         Logger.info('time consuming: [%.2f]s' % (time.time() - t3))
         time.sleep(0.01)
 
@@ -99,13 +104,14 @@ if __name__ == '__main__':
     Logger.info('start yolo main')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--weights', type=str, default='/raceai/data/ckpts/yolov5/yolov5l.pt', help='model.pt path(s)')
+    parser.add_argument('--weights', type=str, default='/ckpts/l.pt', help='model.pt path(s)')
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     opt = parser.parse_args()
+    Logger.info(opt)
 
     with torch.no_grad():
         Logger.info('start yolo detect')

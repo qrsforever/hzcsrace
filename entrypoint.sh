@@ -30,13 +30,13 @@ do
             ;;
         "yolo")
             python zmq/yolo_inference.py \
-                --weights /raceai/data/ckpts/yolov5/yolov5l.pt \
-                --img-size 640 --conf-thres 0.25 --iou-thres 0.45 \
+                --weights /ckpts/l.pt \
+                --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
                 --device 0
             ;;
         *)
             echo "SS_MODULE set error"
             break;;
     esac
-    sleep 5
+    sleep 3
 done
