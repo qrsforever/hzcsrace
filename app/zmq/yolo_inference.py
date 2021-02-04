@@ -55,15 +55,17 @@ def detect(opt):
     while True:
         try:
             cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
+            stime = time.time()
             cfg = OmegaConf.create(cfg)
             Logger.info(cfg)
             if 'pigeon' not in cfg:
                 continue
+            conf_thres = opt.conf_thres
+            iou_thres = opt.iou_thres
             msgkey = f'{topic}.result'
             if 'msgkey' in cfg.pigeon:
                 msgkey = cfg.pigeon.msgkey
             resdata = {'pigeon': dict(cfg.pigeon), 'task': topic, 'errno': 0, 'result': []}
-            t3 = time.time()
             data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
             for source in data_loader:
                 dataset = LoadImages(source, img_size=imgsz)
@@ -76,7 +78,12 @@ def detect(opt):
                 if img.ndimension() == 3:
                     img = img.unsqueeze(0)
                 pred = model(img, augment=opt.augment)[0]
-                pred = non_max_suppression(pred, opt.conf_thres, opt.iou_thres)
+                if 'nms' in cfg:
+                    if 'conf_thres' in cfg.nms:
+                        conf_thres = cfg.nms.conf_thres
+                    if 'iou_thres' in cfg.nms:
+                        iou_thres = cfg.nms.iou_thres
+                pred = non_max_suppression(pred, conf_thres, iou_thres)
                 for i, det in enumerate(pred):
                     if len(det) == 0:
                         continue
@@ -89,14 +96,15 @@ def detect(opt):
                             plot_one_box(xyxy, im0, label='%.3f' % conf, line_thickness=1)
                             cv2.imwrite(f'/raceai/data/{i}.png', im0)
                 resdata['result'].append(resitem)
-            Logger.info(resdata)
+            resdata['running_time'] = round(time.time() - stime, 3)
             race_report_result(msgkey, resdata)
+            Logger.info('time consuming: [%.2f]s' % (resdata['running_time']))
+            Logger.info(resdata)
         except Exception:
             resdata['errno'] = -1 # todo
             resdata['traceback'] = traceback.format_exc()
             race_report_result(msgkey, resdata)
             Logger.error(resdata)
-        Logger.info('time consuming: [%.2f]s' % (time.time() - t3))
         time.sleep(0.01)
 
 
