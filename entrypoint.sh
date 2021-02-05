@@ -28,9 +28,10 @@ do
             --redis_port ${REDIS_PORT} \
             --redis_passwd ${REDIS_PSWD}
             ;;
-        "yolo")
+        "yolov5")
             python zmq/yolo_inference.py \
-                --weights /ckpts/l.pt \
+                --weights /ckpts/${MODEL_LEVEL:-"x"}.pt \
+                --topic zmq.yolov5${MODEL_LEVEL:-"x"}.inference \
                 --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
                 --device 0
             ;;

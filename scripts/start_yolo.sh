@@ -12,22 +12,16 @@ VENDOR=hzcsai_com
 PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
 
-cmd=""
 arg=""
-
-if [[ x$1 == xdev ]]
-then
-    arg="it --restart unless-stopped"
-    shift
-else
-    cmd="-s yolo"
-fi
+cmd="-s yolov5"
+model="x" # [s,l,x]
 
 __start_raceai()
 {
-    docker run -d${arg} --runtime nvidia --name ${PROJECT}-yolo \
+    docker run -d${arg} --runtime nvidia --name ${PROJECT}-yolov5$model \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
+        --env MODEL_LEVEL=$model \
         --volume /raceai/data:/raceai/data \
         --volume /raceai/data/ckpts/yolov5/faces:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
@@ -36,4 +30,21 @@ __start_raceai()
         --volume $TOP_DIR/projects/yolov5:/raceai/codes/projects/yolov5 \
         $REPOSITORY $cmd
 }
+
+while getopts "dm:" OPT;
+do
+    case $OPT in
+        d)
+            arg="it --restart unless-stopped"
+            cmd=""
+            ;;
+        m)
+            model=$OPTARG
+            ;;
+        *)
+            echo "arg error"
+            exit 0
+    esac
+done
+
 __start_raceai

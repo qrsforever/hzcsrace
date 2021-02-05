@@ -31,10 +31,8 @@ race_set_loglevel('info')
 race_set_logfile('/tmp/raceai-yolo.log')
 
 context = zmq.Context()
-topic = 'zmq.yolo.inference'
 zmqsub = context.socket(zmq.SUB)
 zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
-zmqsub.subscribe(topic)
 
 
 def detect(opt):
@@ -62,16 +60,16 @@ def detect(opt):
                 continue
             conf_thres = opt.conf_thres
             iou_thres = opt.iou_thres
-            msgkey = f'{topic}.result'
+            msgkey = opt.topic
             if 'msgkey' in cfg.pigeon:
                 msgkey = cfg.pigeon.msgkey
-            resdata = {'pigeon': dict(cfg.pigeon), 'task': topic, 'errno': 0, 'result': []}
+            resdata = {'pigeon': dict(cfg.pigeon), 'task': opt.topic, 'errno': 0, 'result': []}
             data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
-            for source in data_loader:
-                dataset = LoadImages(source, img_size=imgsz)
+            for image_path, source in data_loader:
+                dataset = LoadImages(image_path, img_size=imgsz)
                 path, img, im0, _ = next(iter(dataset))
                 Logger.info(path)
-                resitem = {'image_path': path, 'faces_det':[]}
+                resitem = {'image_path': source, 'faces_det':[]}
                 img = torch.from_numpy(img).to(device)
                 img = img.half() if half else img.float()
                 img /= 255.0
@@ -118,8 +116,11 @@ if __name__ == '__main__':
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
     parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
+    parser.add_argument('--topic', default='zmq.yolov5l.inference', help='sub topic')
     opt = parser.parse_args()
     Logger.info(opt)
+
+    zmqsub.subscribe(opt.topic)
 
     with torch.no_grad():
         Logger.info('start yolo detect')

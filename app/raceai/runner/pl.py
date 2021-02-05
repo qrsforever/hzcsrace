@@ -7,7 +7,6 @@
 # @version 1.0
 # @date 2020-11-27 13:09
 
-import os
 import numpy as np # noqa
 import torch # noqa
 import torchvision # noqa

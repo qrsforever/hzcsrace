@@ -40,13 +40,14 @@ class RawRaceDataset(RaceDataset):
             self.data_prefix = cfg.data_prefix
         else:
             self.data_prefix = ''
-        self.images = self.data_reader(source)
+        self.images, self.sources = self.data_reader(source)
 
     def data_reader(self, sources):
         if isinstance(sources, str):
-            return [race_data(sources)]
+            return [race_data(sources)], [sources]
         elif isinstance(sources, (tuple, list)):
             images = []
+            datass = []
             for item in sources:
                 if isinstance(item, str):
                     if self.data_prefix:
@@ -54,13 +55,14 @@ class RawRaceDataset(RaceDataset):
                     else:
                         path = item
                     images.append(race_data(path))
+                    datass.append(item)
                 else:
                     assert RuntimeError(type(item))
-            return images
+            return images, datass
         assert RuntimeError(type(sources))
 
     def __getitem__(self, index):
-        return self.images[index]
+        return self.images[index], self.sources[index]
 
     def __len__(self):
         return len(self.images)
