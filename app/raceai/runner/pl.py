@@ -11,14 +11,15 @@ import numpy as np # noqa
 import torch # noqa
 import torchvision # noqa
 import pytorch_lightning as pl
+from pytorch_lightning.utilities.cloud_io import load as pl_load
 from torch.nn import functional as F
 
 
 class PlClassifier(pl.LightningModule):
-    def __init__(self, trainer, model, optimizer, scheduler):
+    def __init__(self, model, optimizer, scheduler):
         super().__init__()
         self.model = model
-        self.trainer = trainer
+        # self.trainer = trainer
         self.optimizer = optimizer
         self.scheduler = scheduler
         self.metrics = {
@@ -79,14 +80,15 @@ class PlClassifier(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         inputs, y_trues, paths = batch
         y_preds = self(inputs)
-        acc = (torch.argmax(y_preds, dim=1) == y_trues).float().mean()
+        acc = (torch.argmax(y_preds, dim=1) == y_trues).float().mean().cpu()
         log = {'test_acc': acc}
+        print(list(zip(paths, y_trues, y_preds)))
         return log
 
     def test_epoch_end(self, outputs):
         log = {}
         if 'test_acc' in outputs[0]:
-            log['test_acc'] = torch.stack([x['test_acc'] for x in outputs]).mean().numpy()
+            log['test_acc'] = torch.stack([x['test_acc'] for x in outputs]).mean()
         self.log_dict(log)
 
     def get_progress_bar_dict(self):
@@ -94,22 +96,27 @@ class PlClassifier(pl.LightningModule):
         items.pop("v_num", None)
         return items
 
-    def fit(self, train_loader, valid_loader):
-        return self.trainer.fit(self, train_loader, valid_loader)
 
-    def test(self, test_loader):
-        return self.trainer.test(self, test_loader)
+class PlTrainer(pl.Trainer):
+    def __init__(self, logger, callbacks, *args, **kwargs):
+        super().__init__(
+                logger=logger,
+                callbacks=callbacks,
+                num_sanity_val_steps=0, *args, **kwargs)
 
-    def predict(self, test_loader):
+    def predict(self, model, test_loader):
         def predict_step(self, batch, batch_idx):
-            inputs, tags, paths = batch
+            inputs, y_trues, paths = batch
             y_preds = self(inputs)
-            return list(zip(paths, tags, F.softmax(y_preds, dim=1)))
+            print(list(zip(paths, y_trues, y_preds)))
+            return list(zip(paths, y_trues, F.softmax(y_preds, dim=1)))
 
         def predict_epoch_end(self, outputs):
             result = {'output':[]}
             for item in outputs:
                 for path, tag, preds in item:
+                    if isinstance(tag, torch.Tensor):
+                        tag = tag.cpu().item()
                     probs = preds.cpu()
                     probs_sorted = probs.sort(descending=True)
                     result['output'].append({
@@ -122,23 +129,19 @@ class PlClassifier(pl.LightningModule):
                         }})
             self.log_dict(result)
         try:
-            _test_step = getattr(self.__class__, 'test_step', None)
-            _test_epoch_end = getattr(self.__class__, 'test_epoch_end', None)
-            setattr(self.__class__, 'test_step', predict_step)
-            setattr(self.__class__, 'test_epoch_end', predict_epoch_end)
-            return self.trainer.test(self, test_loader, verbose=True)
+            _test_step = getattr(model.__class__, 'test_step', None)
+            _test_epoch_end = getattr(model.__class__, 'test_epoch_end', None)
+            setattr(model.__class__, 'test_step', predict_step)
+            setattr(model.__class__, 'test_epoch_end', predict_epoch_end)
+            # load checkpoint
+            ckpt = pl_load(self.resume_from_checkpoint, map_location=lambda storage, loc: storage)
+            model.load_state_dict(ckpt['state_dict'])
+            return self.test(model, test_dataloaders=test_loader,
+                   verbose=True)
         except Exception as err:
             raise err
         finally:
             if _test_step:
-                setattr(self.__class__, 'test_step', _test_step)
+                setattr(model.__class__, 'test_step', _test_step)
             if _test_epoch_end:
-                setattr(self.__class__, 'test_epoch_end', _test_epoch_end)
-
-
-class PlTrainer(pl.Trainer):
-    def __init__(self, logger, callbacks, *args, **kwargs):
-        super().__init__(
-                logger=logger,
-                callbacks=callbacks,
-                num_sanity_val_steps=0, *args, **kwargs)
+                setattr(model.__class__, 'test_epoch_end', _test_epoch_end)

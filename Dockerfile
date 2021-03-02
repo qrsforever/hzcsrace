@@ -1,4 +1,4 @@
-FROM ufoym/deepo:1.7.0.dev20200819
+FROM ufoym/deepo:1.8.0.dev20210103
 
 LABEL maintainer="hzcskrace@hzcsai.com"
 
@@ -44,7 +44,7 @@ RUN APT_INSTALL="apt install -y --no-install-recommends" && \
         libxvidcore-dev libx264-dev libatlas-base-dev gfortran \
         jq libgl1-mesa-glx ffmpeg
 
-RUN PIP_INSTALL="pip install -U --no-cache-dir --retries 20 --timeout 120 \
+RUN PIP_INSTALL="pip install --no-cache-dir --retries 20 --timeout 120 \
         --trusted-host mirrors.intra.didiyun.com \
         --index-url http://mirrors.intra.didiyun.com/pip/simple" && \
     $PIP_INSTALL pip && pip uninstall -y enum34 && \
@@ -54,23 +54,23 @@ RUN PIP_INSTALL="pip install -U --no-cache-dir --retries 20 --timeout 120 \
     pyhocon protobuf redis "jsonnet>=0.10.0" && \
     pip uninstall -y opencv-python
 
-# install opencv
+# install opencv (dobble)
 
-COPY external/opencv/4.3.0.tar.gz 4.3.0.tar.gz
-RUN tar zxf 4.3.0.tar.gz && cd opencv-4.3.0 && mkdir build && cd build && \
-    cmake -D CMAKE_BUILD_TYPE=RELEASE \
-        -D CMAKE_INSTALL_PREFIX=$(python -c "import sys; print(sys.prefix)") \
-        -D ENABLE_FAST_MATH=ON \
-        -D INSTALL_PYTHON_EXAMPLES=OFF \
-        -D INSTALL_C_EXAMPLES=OFF \
-        -D OPENCV_ENABLE_NONFREE=OFF \
-        -D CMAKE_INSTALL_PREFIX=$(python -c "import sys; print(sys.prefix)") \
-        -D PYTHON_EXECUTABLE=$(which python) \
-        -D PYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") \
-        -D PYTHON_PACKAGES_PATH=$(python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())") \
-        -D BUILD_EXAMPLES=OFF \
-        -D BUILD_JPEG=ON .. && \
-    make -j8 && make install && ldconfig && cd ../.. && rm -rf 4.3.0.tar.gz opencv-4.3.0
+# COPY external/opencv/4.3.0.tar.gz 4.3.0.tar.gz
+# RUN tar zxf 4.3.0.tar.gz && cd opencv-4.3.0 && mkdir build && cd build && \
+#     cmake -D CMAKE_BUILD_TYPE=RELEASE \
+#         -D CMAKE_INSTALL_PREFIX=$(python -c "import sys; print(sys.prefix)") \
+#         -D ENABLE_FAST_MATH=ON \
+#         -D INSTALL_PYTHON_EXAMPLES=OFF \
+#         -D INSTALL_C_EXAMPLES=OFF \
+#         -D OPENCV_ENABLE_NONFREE=OFF \
+#         -D CMAKE_INSTALL_PREFIX=$(python -c "import sys; print(sys.prefix)") \
+#         -D PYTHON_EXECUTABLE=$(which python) \
+#         -D PYTHON_INCLUDE_DIR=$(python -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") \
+#         -D PYTHON_PACKAGES_PATH=$(python -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())") \
+#         -D BUILD_EXAMPLES=OFF \
+#         -D BUILD_JPEG=ON .. && \
+#     make -j8 && make install && ldconfig && cd ../.. && rm -rf 4.3.0.tar.gz opencv-4.3.0
 
 # update python3
 
@@ -79,12 +79,16 @@ RUN tar zxf 4.3.0.tar.gz && cd opencv-4.3.0 && mkdir build && cd build && \
 
 # pytorch-lightning
 
-COPY projects/pytorch-lightning /raceai/codes/projects/pytorch-lightning
-RUN cd /raceai/codes/projects/pytorch-lightning && \
-    pip install --no-cache-dir --retries 20 --timeout 120 \
-        --trusted-host mirrors.intra.didiyun.com \
-        --index-url http://mirrors.intra.didiyun.com/pip/simple \
-        --editable .
+# COPY projects/pytorch-lightning /raceai/codes/projects/pytorch-lightning
+# RUN cd /raceai/codes/projects/pytorch-lightning && \
+#     pip install --no-cache-dir --retries 20 --timeout 120 \
+#         --trusted-host mirrors.intra.didiyun.com \
+#         --index-url http://mirrors.intra.didiyun.com/pip/simple \
+#         --editable .
+RUN pip install --no-cache-dir --retries 20 --timeout 120 \
+         --trusted-host mirrors.intra.didiyun.com \
+         --index-url http://mirrors.intra.didiyun.com/pip/simple \
+         pytorch-lightning
 
 # detectron2
 
@@ -109,6 +113,14 @@ ENV PYTHONPATH=/raceai/codes/projects/yolov5:$PYTHONPATH
 #     apt-get clean && \
 #     apt-get autoremove && \
 #     rm -rf /var/lib/apt/lists/* /tmp/* ~/*
+
+# Other
+
+RUN pip install --no-cache-dir --retries 20 --timeout 120 \
+         --trusted-host mirrors.intra.didiyun.com \
+         --index-url http://mirrors.intra.didiyun.com/pip/simple \
+         opencv-python
+         
 
 SHELL ["/bin/bash"]               
 COPY entrypoint.sh /entrypoint.sh

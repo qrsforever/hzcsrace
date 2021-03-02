@@ -49,14 +49,14 @@ def pl_classifier_fit(cfg):
     trainer = trainer_class(logger, callbacks, **cfg.solver.trainer.params.general)
 
     ## runner.fit
-    classifier = PlClassifier(trainer, model, optimizer, scheduler)
-    classifier.fit(train_loader, valid_loader)
+    classifier = PlClassifier(model, optimizer, scheduler)
+    trainer.fit(classifier, train_loader, valid_loader)
 
     ## runner.test
     if 'test' in cfg.data:
         test_loader_class = race_load_class(cfg.data.test.class_name)
         test_loader = test_loader_class(cfg.data.test.params).get()
-        result = classifier.test(test_loader)
+        result = trainer.test(classifier, test_loader)
     return {'errno': 0, 'result': result}
 
 
