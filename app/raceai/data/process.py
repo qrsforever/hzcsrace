@@ -10,14 +10,23 @@ from raceai.utils.misc import race_load_class
 # from raceai.utils.misc import race_data
 
 
+def to_list_dict(data):
+    if isinstance(data, omegaconf.ListConfig):
+        sources = list(data)
+        for i in range(len(sources)):
+            sources[i] = to_list_dict(sources[i])
+    elif isinstance(data, omegaconf.DictConfig):
+        sources = dict(data)
+    else:
+        return data
+    return sources 
+
+
 class BaseDataLoader(object):
     dataset = None
 
     def __init__(self, sources, cfg):
-        if isinstance(sources, omegaconf.ListConfig):
-            sources = list(sources)
-        elif isinstance(sources, omegaconf.DictConfig):
-            sources = dict(sources)
+        sources = to_list_dict(sources)
         self.dataset = race_load_class(cfg.dataset.class_name)(sources, cfg.dataset.params)
         if 'sample' in cfg:
             self.dataloader = DataLoader(self.dataset, **cfg.sample)

@@ -16,6 +16,7 @@ from omegaconf import OmegaConf
 from torchvision import transforms
 from detectron2.engine import DefaultPredictor
 from detectron2.utils.visualizer import Visualizer, ColorMode
+from pytorch_lightning.utilities.cloud_io import load as pl_load
 
 from raceai.utils.registrable import FunctionRegister
 from raceai.utils.error import catch_error

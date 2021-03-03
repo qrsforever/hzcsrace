@@ -26,6 +26,18 @@ from raceai.utils.misc import race_data
 
 
 class RaceDataset(ABC, Dataset):
+    def __init__(self, cfg):
+        if 'data_prefix' in cfg:
+            self.data_prefix = cfg.data_prefix
+        else:
+            self.data_prefix = ''
+
+    def data_path(self, p):
+        if self.data_prefix:
+            path = os.path.join(self.data_prefix, p)
+        else:
+            path = p
+        return race_data(path)
 
     @abstractmethod
     def data_reader(self, **kwargs):
@@ -36,25 +48,18 @@ class RaceDataset(ABC, Dataset):
 
 class RawRaceDataset(RaceDataset):
     def __init__(self, source, cfg):
-        if 'data_prefix' in cfg:
-            self.data_prefix = cfg.data_prefix
-        else:
-            self.data_prefix = ''
+        super().__init__(cfg)
         self.images, self.sources = self.data_reader(source)
 
     def data_reader(self, sources):
         if isinstance(sources, str):
-            return [race_data(sources)], [sources]
+            return [self.data_path(sources)], [sources]
         elif isinstance(sources, (tuple, list)):
             images = []
             datass = []
             for item in sources:
                 if isinstance(item, str):
-                    if self.data_prefix:
-                        path = os.path.join(self.data_prefix, item)
-                    else:
-                        path = item
-                    images.append(race_data(path))
+                    images.append(self.data_path(item))
                     datass.append(item)
                 else:
                     assert RuntimeError(type(item))
@@ -70,6 +75,8 @@ class RawRaceDataset(RaceDataset):
 
 class ClsRaceDataset(RaceDataset):
     def __init__(self, source, cfg):
+        super().__init__(cfg)
+        self.images, self.sources = self.data_reader(source)
         input_size = cfg.input_size
         if isinstance(input_size, int):
             input_size = (input_size, input_size)
@@ -118,12 +125,12 @@ class PredictListImageDataset(ClsRaceDataset):
         if isinstance(sources, (list, tuple)):
             for item in sources:
                 if isinstance(item, str):
-                    images.append(race_data(item))
+                    images.append(self.data_path(item))
                     labels.append('-1')
                 elif isinstance(item, dict):
                     if 'image_path' not in item:
                         raise ValueError('not found image_path')
-                    images.append(race_data(item['image_path']))
+                    images.append(self.data_path(item['image_path']))
                     if 'image_id' in item:
                         labels.append(item['image_id'])
                     else:
