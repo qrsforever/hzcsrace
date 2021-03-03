@@ -1,9 +1,10 @@
 #!/bin/bash
 #=================================================================
-# date: 2021-03-03 20:34:07
-# title: start_pl_cr
+# date: 2021-03-03 20:44:24
+# title: start_pl_garbage
 # author: QRS
 #=================================================================
+
 
 CUR_FIL=${BASH_SOURCE[0]}
 TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
@@ -14,14 +15,14 @@ REPOSITORY="$VENDOR/$PROJECT"
 
 __start_raceai()
 {
-    docker run -d${arg} --runtime nvidia --name ${PROJECT}-pl.cr \
+    docker run -d${arg} --runtime nvidia --name ${PROJECT}-pl.garbage \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
-        --env MODEL_WEIGHTS=pl_resnet18_acc90.pth \
-        --env NUM_CLASSES=3 \
-        --env TOPIC=zmq.cr.resnet18.inference \
+        --env MODEL_WEIGHTS=pl_resnet18_acc85.pth \
+        --env NUM_CLASSES=4 \
+        --env TOPIC=zmq.garbage.resnet18.inference \
         --volume /raceai/data:/raceai/data \
-        --volume /raceai/data/ckpts/cleaner_robot:/ckpts \
+        --volume /raceai/data/ckpts/rgarbage:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         $REPOSITORY -s pl

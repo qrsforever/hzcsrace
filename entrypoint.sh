@@ -38,7 +38,8 @@ do
         "pl")
             python3 zmq/pl_inference.py \
                 --weights /ckpts/${MODEL_WEIGHTS} \
-                --num_classes ${NUM_CLASSES}
+                --num_classes ${NUM_CLASSES} \
+                --topic ${TOPIC}
             ;;
         *)
             echo "SS_MODULE set error"
