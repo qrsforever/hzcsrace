@@ -76,7 +76,6 @@ class RawRaceDataset(RaceDataset):
 class ClsRaceDataset(RaceDataset):
     def __init__(self, source, cfg):
         super().__init__(cfg)
-        self.images, self.sources = self.data_reader(source)
         input_size = cfg.input_size
         if isinstance(input_size, int):
             input_size = (input_size, input_size)

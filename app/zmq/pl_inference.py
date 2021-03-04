@@ -43,6 +43,7 @@ def classifer(opt):
     model = PlClassifier(bbmodel, None, None)
     ckpt = torch.load(opt.weights, map_location=lambda storage, loc: storage)
     model.load_state_dict(ckpt['state_dict'])
+    model.eval() # ignore bn and dropout layers
     while True:
         try:
             cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
@@ -57,8 +58,8 @@ def classifer(opt):
             resdata = {'pigeon': dict(cfg.pigeon), 'task': opt.topic, 'errno': 0, 'result': []}
             data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
             for images, labels, paths in data_loader:
-                print(labels)
                 y_preds = model(images)
+                print(y_preds)
                 y_preds = F.softmax(y_preds, dim=1)
                 for path, tag, y_pred in list(zip(paths, labels, y_preds)):
                     if isinstance(tag, torch.Tensor):
@@ -78,6 +79,7 @@ def classifer(opt):
             resdata['running_time'] = round(time.time() - stime, 3)
             Logger.info('time consuming: [%.2f]s' % (resdata['running_time']))
             race_report_result(msgkey, resdata)
+            print(resdata)
         except Exception:
             resdata['errno'] = -1 # todo
             resdata['traceback'] = traceback.format_exc()

@@ -7,7 +7,6 @@ import base64
 import omegaconf
 from torch.utils.data import DataLoader
 from raceai.utils.misc import race_load_class
-# from raceai.utils.misc import race_data
 
 
 def to_list_dict(data):
@@ -39,7 +38,8 @@ class BaseDataLoader(object):
 
 class Base64DataLoader(BaseDataLoader):
     def __init__(self, cfg):
-        imgpath = os.path.join('/tmp/', 'b4img_%d.png' % time.time())
+        # TODO resource release
+        imgpath = os.path.join('/tmp', 'b4img_%02d.png' % (time.time() % 99))
         with open(imgpath, 'wb') as fout:
             fout.write(base64.b64decode(cfg.data_source.split(',')[-1]))
         super().__init__(imgpath, cfg)
@@ -60,13 +60,6 @@ class JsonBase64DataLoader(BaseDataLoader):
 
 class PathListDataLoader(BaseDataLoader):
     def __init__(self, cfg):
-        # imgpaths = []
-        # for item in cfg.data_source:
-        #     if isinstance(item, str):
-        #         pass
-        #     elif isinstance(item, dict):
-        #         pass
-        # imgpaths = [race_data(str(p)) for p in cfg.data_source]
         super().__init__(cfg.data_source, cfg)
 
 
