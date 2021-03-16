@@ -36,9 +36,9 @@ def classifer(opt):
     Logger.info('loading weight [%s]...' % opt.weights)
 
     bbmodel = Resnet18(OmegaConf.create('''{
-        "device": "gpu",
+        "device": "%s",
         "num_classes": %d,
-        "weights": false}''' % opt.num_classes))
+        "weights": false}''' % (opt.device, opt.num_classes)))
 
     model = PlClassifier(bbmodel, None, None)
     ckpt = torch.load(opt.weights, map_location=lambda storage, loc: storage)
@@ -92,6 +92,7 @@ if __name__ == '__main__':
     Logger.info('start pl main')
 
     parser = argparse.ArgumentParser()
+    parser.add_argument('--device', type=str, default='cpu', help='using cuda or cpu')
     parser.add_argument('--weights', type=str, default='/ckpts/best.pth', help='model.pt path(s)')
     parser.add_argument('--num_classes', type=int, default=10, help='inference size (pixels)')
     parser.add_argument('--topic', default='zmq.cr.resnet18.inference', help='sub topic')
