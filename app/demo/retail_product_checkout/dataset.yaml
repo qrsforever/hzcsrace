@@ -4,4 +4,5 @@ test: /raceai/data/datasets/retail_product_checkout/images/train
 
 nc: 6
 
-names: ['优乐美红豆奶茶', '农夫山泉矿泉水', '可口可乐', '芬达橙味', '雪碧', '王老吉']
+names: ['0', '1', '2', '3', '4', '5']
+# names: ['优乐美红豆奶茶', '农夫山泉矿泉水', '可口可乐', '芬达橙味', '雪碧', '王老吉']

@@ -47,12 +47,14 @@ def detect(opt):
     t1 = time.time()
     Logger.info('loading finish [%.2fs]' % (t1 - t0))
     img = torch.zeros((1, 3, imgsz, imgsz), device=device)
-    model(img.half() if half else img) if device.type != 'cpu' else None
+    model(img.half() if half else img)
     t2 = time.time()
     Logger.info('time consuming: [%.2fs]' % (t2 - t1))
+    zmq_stats_count = 0
     while True:
         try:
             cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
+            zmq_stats_count += 1
             stime = time.time()
             cfg = OmegaConf.create(cfg)
             Logger.info(cfg)
@@ -68,8 +70,8 @@ def detect(opt):
             for image_path, source in data_loader:
                 dataset = LoadImages(image_path, img_size=imgsz)
                 path, img, im0, _ = next(iter(dataset))
-                Logger.info(path)
-                resitem = {'image_path': source, 'faces_det':[]}
+                # Logger.info(path)
+                resitem = {'image_path': source, 'predict_box':[]}
                 img = torch.from_numpy(img).to(device)
                 img = img.half() if half else img.float()
                 img /= 255.0
@@ -86,8 +88,9 @@ def detect(opt):
                     if len(det) == 0:
                         continue
                     det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
-                    for *xyxy, conf, _ in reversed(det):
-                        resitem['faces_det'].append({
+                    for *xyxy, conf, cls in reversed(det):
+                        resitem['predict_box'].append({
+                            'label': int(cls),
                             'conf': '%.3f' % conf,
                             'xyxy': [int(x) for x in xyxy]})
                         if view_debug:
@@ -96,7 +99,7 @@ def detect(opt):
                 resdata['result'].append(resitem)
             resdata['running_time'] = round(time.time() - stime, 3)
             race_report_result(msgkey, resdata)
-            Logger.info('time consuming: [%.2f]s' % (resdata['running_time']))
+            Logger.info('[%6d] time consuming: [%.2f]s' % (zmq_stats_count % 99999, resdata['running_time']))
             Logger.info(resdata)
         except Exception:
             resdata['errno'] = -1 # todo
@@ -114,7 +117,7 @@ if __name__ == '__main__':
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')
-    parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+    parser.add_argument('--device', default='cpu', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--topic', default='zmq.yolov5l.inference', help='sub topic')
     opt = parser.parse_args()
