@@ -118,7 +118,7 @@ class PredictDirectoryImageDataset(ClsRaceDataset):
 class PredictListImageDataset(ClsRaceDataset):
     def data_reader(self, sources):
         if isinstance(sources, str):
-            return [sources], ['-1']
+            return [self.data_path(sources)], ['-1']
         images = []
         labels = []
         if isinstance(sources, (list, tuple)):

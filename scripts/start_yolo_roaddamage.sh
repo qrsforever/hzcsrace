@@ -14,7 +14,7 @@ REPOSITORY="$VENDOR/$PROJECT"
 
 arg=""
 cmd="-s yolov5"
-task="faces"
+task="rd"
 model="l" # [s,l,x]
 
 __start_raceai()
@@ -25,7 +25,7 @@ __start_raceai()
         --env TASK=$task \
         --env MODEL_LEVEL=$model \
         --volume /raceai/data:/raceai/data \
-        --volume /raceai/data/ckpts/yolov5/$task:/ckpts \
+        --volume /raceai/data/ckpts/yolov5/road_damage:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         --volume /data/pretrained/cv:/root/.cache/torch/hub/checkpoints \

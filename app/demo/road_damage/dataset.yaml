@@ -1,0 +1,6 @@
+train: /raceai/data/datasets/road_damage/images/train
+val: /raceai/data/datasets/road_damage/images/val
+
+nc: 4
+
+names: ['D00', 'D01', 'D02', 'D04']

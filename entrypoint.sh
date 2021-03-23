@@ -31,7 +31,7 @@ do
         "yolov5")
             python zmq/yolo_inference.py \
                 --weights /ckpts/${MODEL_LEVEL:-"x"}.pt \
-                --topic zmq.yolov5${MODEL_LEVEL:-"x"}.inference \
+                --topic zmq.yolov5.$TASK.${MODEL_LEVEL:-"x"}.inference \
                 --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
                 --device 0
             ;;
