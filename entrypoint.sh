@@ -41,6 +41,11 @@ do
                 --num_classes ${NUM_CLASSES} \
                 --topic ${TOPIC}
             ;;
+        "asr")
+            python3 zmq/asr_inference.py \
+                --ckpts /ckpts/${MODEL} \
+                --topic ${TOPIC}
+            ;;
         *)
             echo "SS_MODULE set error"
             break;;

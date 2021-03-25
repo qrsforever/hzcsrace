@@ -49,9 +49,23 @@ __start_fsgan()
         $REPOSITORY.fsgan
 }
 
+__start_speechbrain()
+{
+    docker run -dit --runtime nvidia --name speechbrain \
+        --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
+        --network host \
+        --volume /raceai/data:/raceai/data \
+        --volume $TOP_DIR/app:/raceai/codes/app \
+        --volume $TOP_DIR/projects/speechbrain:/raceai/codes/projects/speechbrain \
+        $REPOSITORY.sb
+}
+
 if [[ x$1 == xfsgan ]]
 then
     __start_fsgan
+elif [[ x$1 == xsb ]]
+then
+    __start_speechbrain
 else
     __start_raceai
 fi

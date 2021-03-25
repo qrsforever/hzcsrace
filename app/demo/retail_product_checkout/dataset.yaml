@@ -1,6 +1,6 @@
-train: /raceai/data/datasets/retail_product_checkout/images/test
+train: /raceai/data/datasets/retail_product_checkout/images/train
 val: /raceai/data/datasets/retail_product_checkout/images/val
-test: /raceai/data/datasets/retail_product_checkout/images/train
+# test: /raceai/data/datasets/retail_product_checkout/images/test
 
 nc: 6
 

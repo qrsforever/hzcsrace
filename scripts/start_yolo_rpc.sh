@@ -15,7 +15,7 @@ REPOSITORY="$VENDOR/$PROJECT"
 arg=""
 cmd="-s yolov5"
 task="rpc"
-model="l" # [s,l,x]
+model="x" # [s,l,x]
 
 __start_raceai()
 {
