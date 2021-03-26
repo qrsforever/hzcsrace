@@ -53,11 +53,13 @@ def inference(opt):
             for audio_path, source in data_loader:
                 Logger.info(audio_path)
                 if not os.path.exists(audio_path):
+                    Logger.warn(f'{audio_path} is not found!')
                     continue
                 result = asr_model.transcribe_file(audio_path)
                 resdata['result'].append({'id': i, 'text': result})
                 i += 1
             resdata['running_time'] = round(time.time() - stime, 3)
+            Logger.info(resdata)
             race_report_result(msgkey, resdata)
             Logger.info('[%6d] time consuming: [%.2f]s' % (zmq_stats_count % 99999, resdata['running_time']))
             # Logger.info(resdata)
@@ -78,6 +80,8 @@ if __name__ == '__main__':
     parser.add_argument('--device', default='cuda', help='cuda device, i.e. 0 or cuda:0, cuda:1 or cpu')
     opt = parser.parse_args()
     Logger.info(opt)
+
+    os.chdir("/tmp") # Workaround for `transcribe_file` make soft link in current directory
 
     zmqsub.subscribe(opt.topic)
     race_set_logfile(f'/tmp/raceai-{opt.topic}.log')
