@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-import cv2 # noqa
+# import cv2 # noqa
 import json
 
 from abc import ABC, abstractmethod
@@ -154,28 +154,28 @@ class JsonFileDataset(ClsRaceDataset):
         return image_list, label_list
 
 
-class PredictDirectoryImageRaw(RaceDataset):
-    def __init__(self, img_path, cfg):
-        self.images = self.data_reader(img_path)
-
-    def data_reader(self, path):
-        extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.webp')
-        image_list = []
-        for filename in os.listdir(path):
-            if not filename.lower().endswith(extensions):
-                continue
-            image_list.append(f'{path}/{filename}')
-        return image_list
-
-    def __getitem__(self, index):
-        return cv2.imread(self.images[index], cv2.IMREAD_UNCHANGED), self.images[index]
-
-    def __len__(self):
-        return len(self.images)
-
-
-class PredictSingleImageRaw(PredictDirectoryImageRaw):
-    def data_reader(self, path):
-        if isinstance(path, (list, tuple)):
-            return path
-        return [path]
+# class PredictDirectoryImageRaw(RaceDataset):
+#     def __init__(self, img_path, cfg):
+#         self.images = self.data_reader(img_path)
+# 
+#     def data_reader(self, path):
+#         extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.webp')
+#         image_list = []
+#         for filename in os.listdir(path):
+#             if not filename.lower().endswith(extensions):
+#                 continue
+#             image_list.append(f'{path}/{filename}')
+#         return image_list
+# 
+#     def __getitem__(self, index):
+#         return cv2.imread(self.images[index], cv2.IMREAD_UNCHANGED), self.images[index]
+# 
+#     def __len__(self):
+#         return len(self.images)
+# 
+# 
+# class PredictSingleImageRaw(PredictDirectoryImageRaw):
+#     def data_reader(self, path):
+#         if isinstance(path, (list, tuple)):
+#             return path
+#         return [path]

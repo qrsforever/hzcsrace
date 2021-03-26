@@ -18,7 +18,7 @@ def to_list_dict(data):
         sources = dict(data)
     else:
         return data
-    return sources 
+    return sources
 
 
 class BaseDataLoader(object):
@@ -39,10 +39,17 @@ class BaseDataLoader(object):
 class Base64DataLoader(BaseDataLoader):
     def __init__(self, cfg):
         # TODO resource release
-        imgpath = os.path.join('/tmp', 'b4img_%02d.png' % (time.time() % 99))
-        with open(imgpath, 'wb') as fout:
-            fout.write(base64.b64decode(cfg.data_source.split(',')[-1]))
-        super().__init__(imgpath, cfg)
+        data = cfg.data_source.split(',')
+        suffix = 'png'
+        if len(data) == 2:
+            if data[0].find('wav'):
+                suffix = 'wav'
+            elif data[0].find('flac'):
+                suffix = 'flac'
+        filepath = os.path.join('/tmp', 'b64_%02d.%s' % (time.time() % 99, suffix))
+        with open(filepath, 'wb') as fout:
+            fout.write(base64.b64decode(data[-1]))
+        super().__init__(filepath, cfg)
 
 
 class JsonBase64DataLoader(BaseDataLoader):

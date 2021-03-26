@@ -10,6 +10,7 @@
 import traceback
 import argparse
 import torch
+import os
 from omegaconf import OmegaConf
 
 from raceai.utils.misc import race_load_class, race_report_result
@@ -18,7 +19,7 @@ from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)
 import time # noqa
 import zmq
 
-from speechbrain.pretrained import EncoderDecoderASR
+from speechbrain.pretrained import EncoderDecoderASR, TransformerASR
 
 race_set_loglevel('info')
 
@@ -30,8 +31,9 @@ zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
 def inference(opt):
     asr_model = EncoderDecoderASR.from_hparams(
             source=opt.ckpts,
-            savedir=opt.ckpts
+            savedir=opt.ckpts,
             run_opts={'device': opt.device})
+    Logger.info('load model finish...')
     zmq_stats_count = 0
     while True:
         try:
@@ -46,10 +48,19 @@ def inference(opt):
             if 'msgkey' in cfg.pigeon:
                 msgkey = cfg.pigeon.msgkey
             resdata = {'pigeon': dict(cfg.pigeon), 'task': opt.topic, 'errno': 0, 'result': []}
-            result = asr_model.transcribe_file()
+            data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
+            i = 0
+            for audio_path, source in data_loader:
+                Logger.info(audio_path)
+                if not os.path.exists(audio_path):
+                    continue
+                result = asr_model.transcribe_file(audio_path)
+                resdata['result'].append({'id': i, 'text': result})
+                i += 1
+            resdata['running_time'] = round(time.time() - stime, 3)
             race_report_result(msgkey, resdata)
             Logger.info('[%6d] time consuming: [%.2f]s' % (zmq_stats_count % 99999, resdata['running_time']))
-            Logger.info(resdata)
+            # Logger.info(resdata)
         except Exception:
             resdata['errno'] = -1 # todo
             resdata['traceback'] = traceback.format_exc()
