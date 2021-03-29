@@ -25,6 +25,7 @@ __start_raceai()
         --env TASK=$task \
         --env MODEL=$model \
         --env TOPIC=zmq.asr.${task}.inference \
+        --volume /data:/data \
         --volume /raceai/data:/raceai/data \
         --volume /raceai/data/ckpts/asr:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
