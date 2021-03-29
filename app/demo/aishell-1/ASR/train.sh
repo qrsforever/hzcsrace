@@ -11,7 +11,7 @@ master_port=8555
 nodes_num=1
 procs_num=1
 node_index=0
-batch_size=10
+batch_size=4
 ddp=False
 
 __usage() {
@@ -87,7 +87,7 @@ commargs="--batch_size $batch_size \
 
 if [[ x$ddp == xTrue ]]
 then
-    echo "DDP run"
+    echo "DDP run $batch_size"
     python3 -m torch.distributed.launch \
         --nproc_per_node=$procs_num --nnodes=$nodes_num --node=$node_index \
         --master_addr $master_addr --master_port $master_port \

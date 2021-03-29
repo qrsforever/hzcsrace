@@ -38,7 +38,7 @@ dynamic_batching: True
 
 dynamic_batch_sampler:
    feats_hop_size: 0.01
-   max_batch_len: 4000 # in terms of frames
+   max_batch_len: 2000 # in terms of frames
    left_bucket_len: 200
    multiplier: 1.1
    shuffle: False # if true re-creates batches at each epoch shuffling examples.
