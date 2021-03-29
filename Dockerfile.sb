@@ -33,7 +33,8 @@ ENV TZ=Asia/Shanghai \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     PYTHONIOENCODING=utf-8 \
-    PYTHONPATH=/raceai/codes/app:/raceai/codes/projects/speechbrain:$PYTHONPATH
+    PYTHONPATH=/raceai/codes/app:/raceai/codes/projects/speechbrain:$PYTHONPATH \
+    PIP_INSTALL="pip3 install --no-cache-dir --retries 20 --timeout 120 --trusted-host mirrors.intra.didiyun.com --index-url http://mirrors.intra.didiyun.com/pip/simple"
 
 RUN sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.didiyun\.com\/ubuntu\//g' /etc/apt/sources.list && \
     apt-get update --fix-missing && \
@@ -47,13 +48,12 @@ RUN sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.d
 
 RUN ln -s /usr/bin/python2.7 /usr/bin/python
 
-RUN PIP_INSTALL="pip3 install --no-cache-dir --retries 20 --timeout 120 \
-                 --trusted-host mirrors.intra.didiyun.com \
-        --index-url http://mirrors.intra.didiyun.com/pip/simple" && \
-    $PIP_INSTALL zmq pandas seaborn protobuf pyhocon omegaconf && \
+RUN $PIP_INSTALL scikit-build zmq pandas seaborn protobuf pyhocon omegaconf && \
+    $PIP_INSTALL sentencepiece opencv-python && \
     $PIP_INSTALL torch==1.7.1+cu101 torchvision==0.8.2+cu101 torchaudio==0.7.2 -f \
-    https://download.pytorch.org/whl/torch_stable.html && \
-    cd /raceai/codes/projects/speechbrain && $PIP_INSTALL -r requirements.txt
+    https://download.pytorch.org/whl/torch_stable.html
+    
+RUN cd /raceai/codes/projects/speechbrain && $PIP_INSTALL -r requirements.txt
 
 SHELL ["/bin/bash"]
 COPY entrypoint.sh /entrypoint.sh

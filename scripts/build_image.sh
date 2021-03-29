@@ -109,7 +109,7 @@ __main()
     if [[ x$1 != x ]]
     then
         dfile=$1
-        dname="."${dfile#*.}
+        dname="_"${dfile#*.}
     fi
     __build_image "raceai${dname}" $MAJOR_RACEAI $MINOR_RACEAI 1 $dfile
 }
