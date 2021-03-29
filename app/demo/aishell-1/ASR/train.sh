@@ -50,13 +50,14 @@ while [[ $# -gt 0 ]]; do
             ;;
 
         -m|--master)
+            ddp=True
             master_addr=`echo $2 | cut -d: -f1`
             master_port=`echo $2 | cut -d: -f2`
-            ddp=True
             shift 2
             ;;
 
         -n|--nodes)
+            ddp=True
             nodes_num=`echo $2 | cut -d/ -f2`
             node=`echo $2 | cut -d/ -f1`
             node_index=`expr $node - 1`
@@ -64,6 +65,7 @@ while [[ $# -gt 0 ]]; do
             ;;
 
         -p|--procs)
+            ddp=True
             procs_num=$2
             shift 2
             ;;
@@ -80,6 +82,7 @@ done
 
 if [[ x$ddp == xTrue ]]
 then
+    echo "DDP run"
     python3 -m torch.distributed.launch \
         --nproc_per_node=$procs_num --nnodes=$nodes_num --node=$node_index \
         --master_addr $master_addr --master_port $master_port \
