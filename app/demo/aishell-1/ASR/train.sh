@@ -31,12 +31,11 @@ ARGUMENT_LIST=(
     "master"
     "nodes"
     "procs"
-    "help"
 )
 
 opts=$(getopt \
-    --options "dD$(printf "%.1s:" "${ARGUMENT_LIST[@]}")" \
-    --longoptions "$(printf "%s:," "${ARGUMENT_LIST[@]}")" \
+    --options "dD$(printf "%.1s:" "${ARGUMENT_LIST[@]}")h::" \
+    --longoptions "$(printf "%s:," "${ARGUMENT_LIST[@]}")help::" \
     --name "$prog_name" \
     -- "$@"
 )
