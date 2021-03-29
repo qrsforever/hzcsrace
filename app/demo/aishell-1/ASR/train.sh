@@ -8,14 +8,11 @@
 prog_name=$(basename $0)
 master_addr=10.255.0.58
 master_port=8555
-nodes_num=2
+nodes_num=1
 procs_num=1
 node_index=0
+batch_size=10
 ddp=False
-commargs="--output_folder /data/tmp/sb/aishell-1 \
-    --data_folder /data/datasets/asr/AISHELL-1/ \
-    --data_folder_rirs /data/datasets/asr/noises/ \
-    --tokenizer_file /data/pretrained/asr/aishell-1/tokenizer/5000_unigram.model"
 
 __usage() {
     echo ""
@@ -79,6 +76,14 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+batch_size=`expr $batch_size \* $nodes_num`
+
+commargs="--batch_size $batch_size \
+    --output_folder /data/tmp/sb/aishell-1 \
+    --data_folder /data/datasets/asr/AISHELL-1/ \
+    --data_folder_rirs /data/datasets/asr/noises/ \
+    --tokenizer_file /data/pretrained/asr/aishell-1/tokenizer/5000_unigram.model"
 
 if [[ x$ddp == xTrue ]]
 then
