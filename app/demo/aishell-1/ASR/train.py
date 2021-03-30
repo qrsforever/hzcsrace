@@ -9,11 +9,14 @@ import sys
 import torch
 import logging
 import speechbrain as sb
+import torch.backends.cudnn as cudnn
 from speechbrain.utils.distributed import run_on_main
 from hyperpyyaml import load_hyperpyyaml
 
 logger = logging.getLogger(__name__)
 
+# cudnn.enabled = True
+# cudnn.benchmark = True
 
 # Define training procedure
 class ASR(sb.Brain):

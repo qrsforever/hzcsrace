@@ -46,7 +46,7 @@ RUN sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.d
 	vim && \
     rm -rf /var/lib/apt/lists/*
 
-RUN ln -s /usr/bin/python2.7 /usr/bin/python
+RUN ln -s /usr/bin/python3 /usr/bin/python
 
 RUN $PIP_INSTALL scikit-build zmq pandas seaborn protobuf pyhocon omegaconf && \
     $PIP_INSTALL sentencepiece opencv-python && \
