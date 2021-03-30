@@ -28,6 +28,7 @@ ARGUMENT_LIST=(
     "master"
     "nodes"
     "procs"
+    "bs"
 )
 
 opts=$(getopt \
@@ -64,6 +65,12 @@ while [[ $# -gt 0 ]]; do
         -p|--procs)
             ddp=True
             procs_num=$2
+            shift 2
+            ;;
+
+        -b|--bs)
+            ddp=True
+            batch_size=$2
             shift 2
             ;;
 
