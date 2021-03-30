@@ -73,13 +73,11 @@ while [[ $# -gt 0 ]]; do
             ;;
 
         -b|--bs)
-            ddp=True
             batch_size=$2
             shift 2
             ;;
 
         -a|--amp)
-            ddp=True
             amp=$2
             shift 2
             ;;
@@ -98,11 +96,12 @@ batch_size=`expr $batch_size \* $nodes_num`
 output_dir=/data/tmp/sb/aishell-1
 data_root=/data/datasets/asr
 
-commargs="--batch_size $batch_size \
-    --output_folder $output_dir \
-    --data_folder ${data_root}/AISHELL-1/ \
-    --data_folder_rirs ${data_root}/noises/ \
-    --tokenizer_file /data/pretrained/asr/aishell-1/tokenizer/5000_unigram.model"
+commargs="--auto_mix_prec=$amp \
+	--batch_size $batch_size \
+	--output_folder $output_dir \
+	--data_folder ${data_root}/AISHELL-1/ \
+	--data_folder_rirs ${data_root}/noises/ \
+	--tokenizer_file /data/pretrained/asr/aishell-1/tokenizer/5000_unigram.model"
 
 pid=`ps -eo pid,args | grep "train.py" | grep -v "grep" | cut -c 1-6`
 if [[ x$pid != x ]]
@@ -120,8 +119,8 @@ then
         --nproc_per_node=$procs_num --nnodes=$nodes_num --node=$node_index \
         --master_addr $master_addr --master_port $master_port \
         train.py hparams/train.yaml \
-        --distributed_launch=True --distributed_backend='nccl' --auto_mix_prec=$amp \
+        --distributed_launch=True --distributed_backend='nccl' \
         $commargs
 else
-    python3 train.py hparams/train.yaml $commargs
+    python3 train.py hparams/train.yaml $commargs # --device=cpu
 fi
