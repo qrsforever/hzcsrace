@@ -11,7 +11,7 @@ master_port=8555
 nodes_num=1
 procs_num=1
 node_index=0
-batch_size=4
+batch_size=12
 ddp=False
 
 __usage() {
@@ -84,6 +84,13 @@ commargs="--batch_size $batch_size \
     --data_folder /data/datasets/asr/AISHELL-1/ \
     --data_folder_rirs /data/datasets/asr/noises/ \
     --tokenizer_file /data/pretrained/asr/aishell-1/tokenizer/5000_unigram.model"
+
+pid=`ps -eo pid,args | grep "train.py" | grep -v "grep" | cut -c 1-6`
+if [[ x$pid != x ]]
+then
+    echo "kill $pid"
+    kill -9 $pid
+fi
 
 if [[ x$ddp == xTrue ]]
 then
