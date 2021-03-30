@@ -11,15 +11,15 @@
 
 seed: 1
 __set_seed: !apply:torch.manual_seed [!ref <seed>]
-output_folder: !ref /data/tmp/sb/aishell-1/results/base/<seed>
+output_folder: !ref results/base/<seed>
 cer_file: !ref <output_folder>/cer.txt
 save_folder: !ref <output_folder>/save
 train_log: !ref <output_folder>/train_log.txt
 
 # Data files
-data_folder: !PLACEHOLDER
+data_folder: !PLACEHOLDER # e,g./path/to/aishell
 # noise/ris dataset will automatically be downloaded
-data_folder_rirs: /data/datasets/asr/noises/
+data_folder_rirs: !ref <data_folder> # Change this is needed
 skip_prep: False
 ckpt_interval_minutes: 15 # save checkpoint every N min
 train_data: !ref <output_folder>/train.csv
@@ -38,7 +38,7 @@ dynamic_batching: True
 
 dynamic_batch_sampler:
    feats_hop_size: 0.01
-   max_batch_len: 1000 # in terms of frames
+   max_batch_len: 4000 # in terms of frames
    left_bucket_len: 200
    multiplier: 1.1
    shuffle: False # if true re-creates batches at each epoch shuffling examples.
@@ -71,13 +71,13 @@ cnn_kernelsize: (3, 3)
 time_pooling_size: 4
 rnn_class: !name:speechbrain.nnet.RNN.LSTM
 rnn_layers: 4
-rnn_neurons: 512
+rnn_neurons: 1024
 rnn_bidirectional: True
 dnn_blocks: 2
-dnn_neurons: 256
+dnn_neurons: 512
 emb_size: 128
-dec_neurons: 512
-output_neurons: 4400  # Number of tokens
+dec_neurons: 1024
+output_neurons: 5000  # Number of tokens
 blank_index: 0
 bos_index: 0
 eos_index: 0
