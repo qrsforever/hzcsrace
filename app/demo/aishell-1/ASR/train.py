@@ -224,8 +224,6 @@ def dataio_prepare(hparams):
     )
     test_data = test_data.filtered_sorted(sort_key="duration")
 
-    valid_data = None
-    test_data  = None
     datasets = [train_data, valid_data, test_data]
 
     # Defining tokenizer and loading it
