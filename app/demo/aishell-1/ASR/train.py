@@ -49,6 +49,7 @@ class ASR(sb.Brain):
         logits = self.modules.seq_lin(h)
         p_seq = self.hparams.log_softmax(logits)
 
+
         # Compute outputs
         if stage == sb.Stage.TRAIN:
             current_epoch = self.hparams.epoch_counter.current
@@ -56,6 +57,10 @@ class ASR(sb.Brain):
                 # Output layer for ctc log-probabilities
                 logits = self.modules.ctc_lin(x)
                 p_ctc = self.hparams.log_softmax(logits)
+                x = None
+                e_in = None
+                h = None
+                logits = None
                 return p_ctc, p_seq, wav_lens
             else:
                 return p_seq, wav_lens
@@ -101,6 +106,11 @@ class ASR(sb.Brain):
             )
             loss = self.hparams.ctc_weight * loss_ctc
             loss += (1 - self.hparams.ctc_weight) * loss_seq
+            loss_ctc = None
+            p_ctc = None
+            tokens = None
+            wav_lens = None
+            tokens_lens = None
         else:
             loss = loss_seq
 
@@ -214,6 +224,8 @@ def dataio_prepare(hparams):
     )
     test_data = test_data.filtered_sorted(sort_key="duration")
 
+    valid_data = None
+    test_data  = None
     datasets = [train_data, valid_data, test_data]
 
     # Defining tokenizer and loading it
