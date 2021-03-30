@@ -11,7 +11,7 @@ master_port=8555
 nodes_num=1
 procs_num=1
 node_index=0
-batch_size=2
+batch_size=3
 ddp=False
 
 __usage() {
@@ -99,7 +99,7 @@ then
         --nproc_per_node=$procs_num --nnodes=$nodes_num --node=$node_index \
         --master_addr $master_addr --master_port $master_port \
         train.py hparams/train.yaml \
-        --distributed_launch=True --distributed_backend='nccl' \
+        --distributed_launch=True --distributed_backend='nccl' --auto_mix_prec=True \
         $commargs
 else
     python3 train.py hparams/train.yaml $commargs
