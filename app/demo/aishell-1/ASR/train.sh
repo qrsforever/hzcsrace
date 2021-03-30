@@ -94,7 +94,7 @@ then
     kill -9 $pid
 fi
 
-rm -rf $output_dir/save
+# rm -rf $output_dir/save
 
 if [[ x$ddp == xTrue ]]
 then
