@@ -13,6 +13,7 @@ procs_num=1
 node_index=0
 batch_size=3
 ddp=False
+amp=True
 
 __usage() {
     echo ""
@@ -20,6 +21,8 @@ __usage() {
     echo "-m or --master master_addr:master_port"
     echo "-n or --nodes node/nnodes like 1/3"
     echo "-p or --procs num"
+    echo "-b or --bs"
+    echo "-a or --amp"
     echo "-h or --help"
     echo ""
 }
@@ -29,6 +32,7 @@ ARGUMENT_LIST=(
     "nodes"
     "procs"
     "bs"
+    "amp"
 )
 
 opts=$(getopt \
@@ -74,6 +78,12 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
 
+        -a|--amp)
+            ddp=True
+            amp=$2
+            shift 2
+            ;;
+
         -h|--help)
             __usage && exit 1
             ;;
@@ -101,7 +111,7 @@ then
     kill -9 $pid
 fi
 
-# rm -rf $output_dir/save
+rm -rf $output_dir/save/CKPT*
 
 if [[ x$ddp == xTrue ]]
 then
@@ -110,7 +120,7 @@ then
         --nproc_per_node=$procs_num --nnodes=$nodes_num --node=$node_index \
         --master_addr $master_addr --master_port $master_port \
         train.py hparams/train.yaml \
-        --distributed_launch=True --distributed_backend='nccl' --auto_mix_prec=True \
+        --distributed_launch=True --distributed_backend='nccl' --auto_mix_prec=$amp \
         $commargs
 else
     python3 train.py hparams/train.yaml $commargs
