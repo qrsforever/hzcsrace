@@ -11,7 +11,7 @@ master_port=8555
 nodes_num=1
 procs_num=1
 node_index=0
-batch_size=12
+batch_size=2
 ddp=False
 
 __usage() {
