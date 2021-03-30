@@ -78,11 +78,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 batch_size=`expr $batch_size \* $nodes_num`
+output_dir=/data/tmp/sb/aishell-1
+data_root=/data/datasets/asr
 
 commargs="--batch_size $batch_size \
-    --output_folder /data/tmp/sb/aishell-1 \
-    --data_folder /data/datasets/asr/AISHELL-1/ \
-    --data_folder_rirs /data/datasets/asr/noises/ \
+    --output_folder $output_dir \
+    --data_folder ${data_root}/AISHELL-1/ \
+    --data_folder_rirs ${data_root}/noises/ \
     --tokenizer_file /data/pretrained/asr/aishell-1/tokenizer/5000_unigram.model"
 
 pid=`ps -eo pid,args | grep "train.py" | grep -v "grep" | cut -c 1-6`
@@ -91,6 +93,8 @@ then
     echo "kill $pid"
     kill -9 $pid
 fi
+
+rm -rf $output_dir/save
 
 if [[ x$ddp == xTrue ]]
 then
