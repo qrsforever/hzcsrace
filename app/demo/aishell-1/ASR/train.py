@@ -12,11 +12,15 @@ import speechbrain as sb
 import torch.backends.cudnn as cudnn
 from speechbrain.utils.distributed import run_on_main
 from hyperpyyaml import load_hyperpyyaml
+from torch.cuda import (max_memory_allocated, memory_allocated, max_memory_reserved, memory_reserved)
 
 logger = logging.getLogger(__name__)
 
 # cudnn.enabled = True
 # cudnn.benchmark = True
+
+def _MemUnitMB(value):
+    return round(value / 1024**2, 3)
 
 # Define training procedure
 class ASR(sb.Brain):
@@ -134,7 +138,15 @@ class ASR(sb.Brain):
         """Train the parameters given a single batch in input"""
         predictions = self.compute_forward(batch, sb.Stage.TRAIN)
         loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
-        loss.backward()
+        try:
+            loss.backward()
+        except RuntimeError:
+            print(f'{_MemUnitMB(max_memory_allocated(0))}, {_MemUnitMB(memory_allocated(0))}, {_MemUnitMB(max_memory_reserved(0))}, {_MemUnitMB(memory_reserved(0))}')
+            predictions = None
+            torch.cuda.empty_cache()
+            print(f'{_MemUnitMB(max_memory_allocated(0))}, {_MemUnitMB(memory_allocated(0))}, {_MemUnitMB(max_memory_reserved(0))}, {_MemUnitMB(memory_reserved(0))}')
+            loss.backward()
+
         if self.check_gradients(loss):
             self.optimizer.step()
         self.optimizer.zero_grad()
