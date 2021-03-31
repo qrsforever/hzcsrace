@@ -16,7 +16,7 @@ from torch.cuda import (empty_cache, max_memory_allocated, memory_allocated, max
 
 logger = logging.getLogger(__name__)
 
-def _show_memoy_info():
+def _show_memory_info():
     gc.collect()
     empty_cache()
     print('memory: {:.1f} {:.1f} {:.1f} {:.1f}'.format(
