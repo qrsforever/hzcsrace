@@ -20,8 +20,8 @@ train_log: !ref <output_folder>/train_log.txt
 data_folder: !PLACEHOLDER # e,g./path/to/aishell
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder> # Change this is needed
-skip_prep: False
-ckpt_interval_minutes: 1 # save checkpoint every N min
+skip_prep: True
+ckpt_interval_minutes: 15 # save checkpoint every N min
 train_data: !ref <output_folder>/train.csv
 valid_data: !ref <output_folder>/dev.csv
 test_data: !ref <output_folder>/test.csv

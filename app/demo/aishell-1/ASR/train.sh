@@ -22,7 +22,7 @@ __usage() {
     echo "-n or --nodes node/nnodes like 1/3"
     echo "-p or --procs num"
     echo "-b or --bs"
-    echo "-a or --amp"
+    echo "-a amp"
     echo "-h or --help"
     echo ""
 }
@@ -32,12 +32,11 @@ ARGUMENT_LIST=(
     "nodes"
     "procs"
     "bs"
-    "amp"
 )
 
 opts=$(getopt \
-    --options "dD$(printf "%.1s:" "${ARGUMENT_LIST[@]}")h::" \
-    --longoptions "$(printf "%s:," "${ARGUMENT_LIST[@]}")help::" \
+    --options "adD$(printf "%.1s:" "${ARGUMENT_LIST[@]}")h::" \
+    --longoptions "amp,$(printf "%s:," "${ARGUMENT_LIST[@]}")help::" \
     --name "$prog_name" \
     -- "$@"
 )
@@ -50,6 +49,12 @@ while [[ $# -gt 0 ]]; do
             ddp=True
             shift 1
             ;;
+
+        -a|--amp)
+            amp="--auto_mix_prec=True"
+            shift 1
+            ;;
+
 
         -m|--master)
             ddp=True
@@ -74,11 +79,6 @@ while [[ $# -gt 0 ]]; do
 
         -b|--bs)
             batch_size=$2
-            shift 2
-            ;;
-
-        -a|--amp)
-            amp="--auto_mix_prec=$2"
             shift 2
             ;;
 

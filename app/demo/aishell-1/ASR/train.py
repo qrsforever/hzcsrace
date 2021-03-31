@@ -5,6 +5,7 @@ AISHELL-1 seq2seq model recipe. (Adapted from the LibriSpeech recipe.)
 
 """
 
+import gc
 import sys
 import torch
 import logging
@@ -15,7 +16,8 @@ from torch.cuda import (empty_cache, max_memory_allocated, memory_allocated, max
 
 logger = logging.getLogger(__name__)
 
-def _show_memory_info():
+def _show_memoy_info():
+    gc.collect()
     empty_cache()
     print('memory: {:.1f} {:.1f} {:.1f} {:.1f}'.format(
         memory_allocated(0)/1024/1024,
@@ -146,9 +148,12 @@ class ASR(sb.Brain):
                 self.optimizer.step()
             self.optimizer.zero_grad()
 
-        _show_memory_info()
+        ret = loss.detach().cpu()
         self.batch_idx += 1
-        return loss.detach().cpu()
+
+        del loss
+        _show_memory_info()
+        return ret
 
     def evaluate_batch(self, batch, stage):
         """Computations needed for validation/test batches"""

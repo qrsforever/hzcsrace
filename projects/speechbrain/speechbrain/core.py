@@ -1012,6 +1012,8 @@ class Brain:
                     )
                     t.set_postfix(train_loss=self.avg_train_loss)
 
+                    del loss
+
                     # Debug mode only runs a few batches
                     if self.debug and self.step == self.debug_batches:
                         break
