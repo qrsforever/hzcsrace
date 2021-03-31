@@ -13,7 +13,7 @@ procs_num=1
 node_index=0
 batch_size=3
 ddp=False
-amp=True
+amp=""
 
 __usage() {
     echo ""
@@ -78,7 +78,7 @@ while [[ $# -gt 0 ]]; do
             ;;
 
         -a|--amp)
-            amp=$2
+            amp="--auto_mix_prec=$2"
             shift 2
             ;;
 
@@ -96,7 +96,7 @@ batch_size=`expr $batch_size \* $nodes_num`
 output_dir=/data/tmp/sb/aishell-1
 data_root=/data/datasets/asr
 
-commargs="--auto_mix_prec=$amp \
+commargs="$amp \
 	--batch_size $batch_size \
 	--output_folder $output_dir \
 	--data_folder ${data_root}/AISHELL-1/ \
