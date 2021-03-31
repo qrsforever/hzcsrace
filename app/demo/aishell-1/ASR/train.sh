@@ -103,14 +103,18 @@ commargs="--auto_mix_prec=$amp \
 	--data_folder_rirs ${data_root}/noises/ \
 	--tokenizer_file /data/pretrained/asr/aishell-1/tokenizer/5000_unigram.model"
 
-pid=`ps -eo pid,args | grep "train.py" | grep -v "grep" | cut -c 1-6`
-if [[ x$pid != x ]]
-then
-    echo "kill $pid"
-    kill -9 $pid
-fi
+__kill_resource() {
+    pid=`ps -eo pid,args | grep "train.py" | grep -v "grep" | cut -c 1-6`
+    if [[ x$pid != x ]]
+    then
+        echo "kill $pid"
+        kill -9 $pid
+    fi
+}
 
 rm -rf $output_dir/save/CKPT*
+
+__kill_resource
 
 if [[ x$ddp == xTrue ]]
 then
@@ -124,3 +128,5 @@ then
 else
     python3 train.py hparams/train.yaml $commargs # --device=cpu
 fi
+
+__kill_resource

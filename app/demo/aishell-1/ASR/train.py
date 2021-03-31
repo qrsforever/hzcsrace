@@ -9,18 +9,11 @@ import sys
 import torch
 import logging
 import speechbrain as sb
-import torch.backends.cudnn as cudnn
 from speechbrain.utils.distributed import run_on_main
 from hyperpyyaml import load_hyperpyyaml
-from torch.cuda import (max_memory_allocated, memory_allocated, max_memory_reserved, memory_reserved)
 
 logger = logging.getLogger(__name__)
 
-# cudnn.enabled = True
-# cudnn.benchmark = True
-
-def _MemUnitMB(value):
-    return round(value / 1024**2, 3)
 
 # Define training procedure
 class ASR(sb.Brain):
@@ -53,7 +46,6 @@ class ASR(sb.Brain):
         logits = self.modules.seq_lin(h)
         p_seq = self.hparams.log_softmax(logits)
 
-
         # Compute outputs
         if stage == sb.Stage.TRAIN:
             current_epoch = self.hparams.epoch_counter.current
@@ -61,10 +53,6 @@ class ASR(sb.Brain):
                 # Output layer for ctc log-probabilities
                 logits = self.modules.ctc_lin(x)
                 p_ctc = self.hparams.log_softmax(logits)
-                x = None
-                e_in = None
-                h = None
-                logits = None
                 return p_ctc, p_seq, wav_lens
             else:
                 return p_seq, wav_lens
@@ -110,11 +98,6 @@ class ASR(sb.Brain):
             )
             loss = self.hparams.ctc_weight * loss_ctc
             loss += (1 - self.hparams.ctc_weight) * loss_seq
-            loss_ctc = None
-            p_ctc = None
-            tokens = None
-            wav_lens = None
-            tokens_lens = None
         else:
             loss = loss_seq
 
@@ -136,22 +119,26 @@ class ASR(sb.Brain):
 
     def fit_batch(self, batch):
         """Train the parameters given a single batch in input"""
-        predictions = self.compute_forward(batch, sb.Stage.TRAIN)
-        loss = self.compute_objectives(predictions, batch, sb.Stage.TRAIN)
-        try:
-            loss.backward()
-        except RuntimeError:
-            print(f'{_MemUnitMB(max_memory_allocated(0))}, {_MemUnitMB(memory_allocated(0))}, {_MemUnitMB(max_memory_reserved(0))}, {_MemUnitMB(memory_reserved(0))}')
-            predictions = None
-            torch.cuda.empty_cache()
-            print(f'{_MemUnitMB(max_memory_allocated(0))}, {_MemUnitMB(memory_allocated(0))}, {_MemUnitMB(max_memory_reserved(0))}, {_MemUnitMB(memory_reserved(0))}')
-            loss.backward()
 
-        if self.check_gradients(loss):
-            self.optimizer.step()
-        self.optimizer.zero_grad()
+        if self.auto_mix_prec:
+            with torch.cuda.amp.autocast():
+                outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+                loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+                self.scaler.scale(loss).backward()
+                if self.check_gradients(loss):
+                    self.scaler.step(self.optimizer)
+                self.optimizer.zero_grad()
+                self.scaler.update()
+        else:
+            outputs = self.compute_forward(batch, sb.Stage.TRAIN)
+            loss = self.compute_objectives(outputs, batch, sb.Stage.TRAIN)
+            loss.backward()
+            if self.check_gradients(loss):
+                self.optimizer.step()
+            self.optimizer.zero_grad()
+
         self.batch_idx += 1
-        return loss.detach()
+        return loss.detach().cpu()
 
     def evaluate_batch(self, batch, stage):
         """Computations needed for validation/test batches"""

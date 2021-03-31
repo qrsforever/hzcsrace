@@ -41,6 +41,7 @@ dynamic_batch_sampler:
    max_batch_len: 4000 # in terms of frames
    left_bucket_len: 200
    multiplier: 1.1
+   num_workers: 1
    shuffle: False # if true re-creates batches at each epoch shuffling examples.
 
 # Feature parameters

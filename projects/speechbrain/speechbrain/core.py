@@ -41,10 +41,6 @@ torch._C._jit_set_profiling_executor(False)
 torch._C._jit_set_profiling_mode(False)
 INTRA_EPOCH_CKPT_FLAG = "brain_intra_epoch_ckpt"
 
-from torch.cuda import (max_memory_allocated, memory_allocated, max_memory_reserved, memory_reserved)
-
-def _MemUnitMB(value):
-    return round(value / 1024**2, 3)
 
 def create_experiment_directory(
     experiment_directory,
@@ -434,7 +430,7 @@ class Brain:
             "distributed_launch": False,
             "distributed_backend": "nccl",
             "jit_module_keys": None,
-            "auto_mix_prec": True,
+            "auto_mix_prec": False,
             "max_grad_norm": 5.0,
             "nonfinite_patience": 3,
             "progressbar": True,
@@ -1014,7 +1010,6 @@ class Brain:
                     self.avg_train_loss = self.update_average(
                         loss, self.avg_train_loss
                     )
-                    loss = None
                     t.set_postfix(train_loss=self.avg_train_loss)
 
                     # Debug mode only runs a few batches
@@ -1030,19 +1025,12 @@ class Brain:
                         run_on_main(self._save_intra_epoch_ckpt)
                         last_ckpt_time = time.time()
 
-                    print(f'{_MemUnitMB(max_memory_allocated(0))}, {_MemUnitMB(memory_allocated(0))}, {_MemUnitMB(max_memory_reserved(0))}, {_MemUnitMB(memory_reserved(0))}')
-                    torch.cuda.empty_cache()
-
             # Run train "on_stage_end" on all processes
             self.on_stage_end(Stage.TRAIN, self.avg_train_loss, epoch)
             self.avg_train_loss = 0.0
             self.step = 0
 
-            print(f'{_MemUnitMB(max_memory_allocated(0))}, {_MemUnitMB(memory_allocated(0))}, {_MemUnitMB(max_memory_reserved(0))}, {_MemUnitMB(memory_reserved(0))}')
-            # torch.cuda.empty_cache()
-            # torch.cuda.memory_summary(device=None, abbreviated=False)
             # Validation stage
-            valid_set = None
             if valid_set is not None:
                 self.on_stage_start(Stage.VALID, epoch)
                 self.modules.eval()
