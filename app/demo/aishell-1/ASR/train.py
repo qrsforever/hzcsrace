@@ -11,8 +11,17 @@ import logging
 import speechbrain as sb
 from speechbrain.utils.distributed import run_on_main
 from hyperpyyaml import load_hyperpyyaml
+from torch.cuda import (empty_cache, max_memory_allocated, memory_allocated, max_memory_reserved, memory_reserved)
 
 logger = logging.getLogger(__name__)
+
+def _show_memory_info():
+    empty_cache()
+    print('memory: {:.1f} {:.1f} {:.1f} {:.1f}'.format(
+        memory_allocated(0)/1024/1024,
+        max_memory_allocated(0)/1024/1024,
+        memory_reserved(0)/1024/1024,
+        max_memory_reserved(0)/1024/1024))
 
 
 # Define training procedure
@@ -137,6 +146,7 @@ class ASR(sb.Brain):
                 self.optimizer.step()
             self.optimizer.zero_grad()
 
+        _show_memory_info()
         self.batch_idx += 1
         return loss.detach().cpu()
 

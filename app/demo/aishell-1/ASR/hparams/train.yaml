@@ -21,7 +21,7 @@ data_folder: !PLACEHOLDER # e,g./path/to/aishell
 # noise/ris dataset will automatically be downloaded
 data_folder_rirs: !ref <data_folder> # Change this is needed
 skip_prep: False
-ckpt_interval_minutes: 15 # save checkpoint every N min
+ckpt_interval_minutes: 1 # save checkpoint every N min
 train_data: !ref <output_folder>/train.csv
 valid_data: !ref <output_folder>/dev.csv
 test_data: !ref <output_folder>/test.csv
@@ -49,7 +49,7 @@ sample_rate: 16000
 n_fft: 400
 n_mels: 40
 
-opt_class: !name:torch.optim.Adam
+opt_class: !name:torch.optim.SGD
    lr: !ref <lr>
 
 # Dataloader options
