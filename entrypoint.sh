@@ -46,6 +46,14 @@ do
                 --ckpts /ckpts/${MODEL} \
                 --topic ${TOPIC}
             ;;
+        "ccpd2019")
+            python3 zmq/ccpd2019_inference.py \
+                --det_weights /ckpts/det.pt \
+                --cls_weights /ckpts/cls.pt \
+                --topic zmq.ccpd2019.inference \
+                --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
+                --device 0
+            ;;
         *)
             echo "SS_MODULE set error"
             break;;
