@@ -178,8 +178,8 @@ if __name__ == '__main__':
     Logger.info('start ccpd2019 main')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--cls_weights', type=str, default='/ckpts/det.pt', help='detech model weight path(s)')
-    parser.add_argument('--det_weights', type=str, default='/ckpts/cls.pt', help='classifer model weight path(s)')
+    parser.add_argument('--cls_weights', type=str, default='/ckpts/cls.pt', help='detech model weight path(s)')
+    parser.add_argument('--det_weights', type=str, default='/ckpts/det.pt', help='classifer model weight path(s)')
     parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
     parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
     parser.add_argument('--iou-thres', type=float, default=0.45, help='IOU threshold for NMS')

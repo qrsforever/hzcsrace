@@ -54,6 +54,14 @@ do
                 --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
                 --device 0
             ;;
+        "lprnet")
+            python3 zmq/lprnet_inference.py \
+                --det_weights /ckpts/det.pt \
+                --cls_weights /ckpts/lprnet.pt \
+                --topic zmq.lprnet.inference \
+                --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
+                --device 0
+            ;;
         *)
             echo "SS_MODULE set error"
             break;;
