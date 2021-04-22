@@ -218,5 +218,5 @@ if __name__ == '__main__':
         os.system(cmd)
     if not is_installed('cython_bbox'):
         print("\nInstall `cython_bbox`...")
-        cmd = 'python -m pip install git+https://github.com/yanfengliu/cython_bbox.git'
+        cmd = 'python -m pip install git+https://github.com.cnpmjs.org/yanfengliu/cython_bbox.git'
         os.system(cmd)
