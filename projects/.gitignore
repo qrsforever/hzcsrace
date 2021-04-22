@@ -3,3 +3,4 @@
 .yolov5
 .pytorch-lightning
 .fnst/
+.AlphaPose
