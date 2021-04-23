@@ -20,6 +20,8 @@ parser.add_argument('--cfg',
                     type=str)
 parser.add_argument('--exp-id', default='default', type=str,
                     help='Experiment ID')
+parser.add_argument('--work_dir', default='/raceai/data/tmp/alphapose', type=str,
+                    help='Experiment ID')
 
 "----------------------------- General options -----------------------------"
 parser.add_argument('--nThreads', default=60, type=int,
@@ -58,15 +60,15 @@ cfg = update_config(opt.cfg)
 cfg['FILE_NAME'] = cfg_file_name
 cfg.TRAIN.DPG_STEP = [i - cfg.TRAIN.DPG_MILESTONE for i in cfg.TRAIN.DPG_STEP]
 opt.world_size = cfg.TRAIN.WORLD_SIZE
-opt.work_dir = './exp/{}-{}/'.format(opt.exp_id, cfg_file_name)
+# opt.work_dir = './exp/{}-{}/'.format(opt.exp_id, cfg_file_name)
 opt.gpus = [i for i in range(torch.cuda.device_count())]
 opt.device = torch.device("cuda:" + str(opt.gpus[0]) if opt.gpus[0] >= 0 else "cpu")
 
-if not os.path.exists("./exp/{}-{}".format(opt.exp_id, cfg_file_name)):
-    os.makedirs("./exp/{}-{}".format(opt.exp_id, cfg_file_name))
+if not os.path.exists(opt.work_dir):
+    os.makedirs(opt.work_dir)
 
 filehandler = logging.FileHandler(
-    './exp/{}-{}/training.log'.format(opt.exp_id, cfg_file_name))
+    '{}/training.log'.format(opt.work_dir))
 streamhandler = logging.StreamHandler()
 
 logger = logging.getLogger('')
