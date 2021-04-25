@@ -193,8 +193,8 @@ def main():
         m = nn.DataParallel(m).cuda()
     else:
         dist.init_process_group(backend='nccl', init_method='env://')
-        torch.cuda.set_device(0)
-        m = DDP(m, device_ids=[0], output_device=0).cuda()
+        torch.cuda.set_device(opt.local_rank)
+        m = DDP(m, device_ids=[opt.local_rank], output_device=opt.local_rank).cuda()
 
     criterion = builder.build_loss(cfg.LOSS).cuda()
 
