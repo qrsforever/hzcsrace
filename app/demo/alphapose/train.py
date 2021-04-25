@@ -194,7 +194,7 @@ def main():
     else:
         dist.init_process_group(backend='nccl', init_method='env://')
         torch.cuda.set_device(opt.local_rank)
-        m = DDP(m, device_ids=[opt.local_rank], output_device=opt.local_rank).cuda()
+        m = DDP(m.cuda(), device_ids=[opt.local_rank], output_device=opt.local_rank)
 
     criterion = builder.build_loss(cfg.LOSS).cuda()
 
