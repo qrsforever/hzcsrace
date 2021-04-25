@@ -33,9 +33,9 @@ def train(opt, train_loader, m, criterion, optimizer, writer):
     m.train()
     norm_type = cfg.LOSS.get('NORM_TYPE', None)
 
-    train_loader = tqdm(train_loader, dynamic_ncols=True)
+    train_loader_tqdm = tqdm(train_loader, dynamic_ncols=True)
 
-    for i, (inps, labels, label_masks, _, bboxes) in enumerate(train_loader):
+    for i, (inps, labels, label_masks, _, bboxes) in enumerate(train_loader_tqdm):
         # QRS
         train_loader.sampler.set_epoch(i)
         if isinstance(inps, list):
@@ -76,13 +76,13 @@ def train(opt, train_loader, m, criterion, optimizer, writer):
             debug_writing(writer, output, labels, inps, opt.trainIters)
 
         # TQDM
-        train_loader.set_description(
+        train_loader_tqdm.set_description(
             'loss: {loss:.8f} | acc: {acc:.4f}'.format(
                 loss=loss_logger.avg,
                 acc=acc_logger.avg)
         )
 
-    train_loader.close()
+    train_loader_tqdm.close()
 
     return loss_logger.avg, acc_logger.avg
 
