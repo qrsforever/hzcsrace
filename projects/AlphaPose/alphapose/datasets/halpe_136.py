@@ -76,7 +76,8 @@ class Halpe_136(CustomDataset):
             else:
                 source = entry['source']
                 if source == 'hico':
-                    abs_path = os.path.join('/DATA1/Benchmark/hico_20160224_det/images/train2015', entry['file_name'])
+                    # abs_path = os.path.join('/DATA1/Benchmark/hico_20160224_det/images/train2015', entry['file_name'])
+                    abs_path = os.path.join(self._root, self._img_prefix, entry['file_name'])
                 elif source == '300wLP':
                     abs_path = os.path.join('/DATA1/Benchmark/300W_LP', entry['file_name'])
                 elif source == 'frei':
@@ -124,7 +125,7 @@ class Halpe_136(CustomDataset):
             xmin, ymin, xmax, ymax = bbox_clip_xyxy(bbox_xywh_to_xyxy(obj['bbox']), width, height)
             # require non-zero box area
             #if obj['area'] <= 0 or xmax <= xmin or ymax <= ymin:
-            if (xmax-xmin)*(ymax-ymin) <= 0 or xmax <= xmin or ymax <= ymin:
+            if (xmax-xmin)*(ymax-ymin) <= 0 or xmax <= xmin or ymax <= ymini:
                 continue
             if 'num_keypoints' in obj and obj['num_keypoints'] == 0:
                 continue
