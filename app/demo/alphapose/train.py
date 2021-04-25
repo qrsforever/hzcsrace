@@ -36,8 +36,6 @@ def train(opt, train_loader, m, criterion, optimizer, writer):
     train_loader_tqdm = tqdm(train_loader, dynamic_ncols=True)
 
     for i, (inps, labels, label_masks, _, bboxes) in enumerate(train_loader_tqdm):
-        # QRS
-        train_loader.sampler.set_epoch(i)
         if isinstance(inps, list):
             inps = [inp.cuda().requires_grad_() for inp in inps]
         else:
@@ -224,6 +222,9 @@ def main():
 
     for i in range(cfg.TRAIN.BEGIN_EPOCH, cfg.TRAIN.END_EPOCH):
         opt.epoch = i
+        # QRS
+        if opt.rank != -1:
+            train_loader.sampler.set_epoch(i)
         current_lr = optimizer.state_dict()['param_groups'][0]['lr']
 
         logger.info(f'############# Starting Epoch {opt.epoch} | LR: {current_lr} #############')

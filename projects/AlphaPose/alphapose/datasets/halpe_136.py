@@ -64,7 +64,8 @@ class Halpe_136(CustomDataset):
             
             if 'source' not in entry: # coco
                 dirname, filename = entry['coco_url'].split('/')[-2:]
-                abs_path = os.path.join('/DATA1/Benchmark/coco', dirname, filename)
+                # abs_path = os.path.join('/DATA1/Benchmark/coco', dirname, filename)
+                abs_path = os.path.join(self._root, self._img_prefix, filename)
                 if not os.path.exists(abs_path):
                     raise IOError('Image: {} not exists.'.format(abs_path))
                 label = self._check_load_keypoints(_coco, entry)
