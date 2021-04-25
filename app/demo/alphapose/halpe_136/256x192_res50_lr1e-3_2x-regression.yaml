@@ -2,7 +2,7 @@ DATASET:
   TRAIN:
     TYPE: 'Halpe_136'
     ROOT: '/raceai/data/datasets/halpe'
-    IMG_PREFIX: 'train2015'
+    IMG_PREFIX: 'hico_20160224_det/images/train2015'
     ANN: 'annotations/halpe_train_v1.json'
     AUG:
       FLIP: true
@@ -13,12 +13,12 @@ DATASET:
   VAL:
     TYPE: 'Halpe_136'
     ROOT: '/raceai/data/datasets/halpe/'
-    IMG_PREFIX: 'test2015'
+    IMG_PREFIX: 'hico_20160224_det/images/test2015'
     ANN: 'annotations/halpe_val_v1.json'
   TEST:
     TYPE: 'Halpe_136_det'
     ROOT: '/raceai/data/datasets/halpe/'
-    IMG_PREFIX: 'test2015'
+    IMG_PREFIX: 'hico_20160224_det/images/test2015'
     DET_FILE: '/raceai/data/tmp/alphapose/json/test_det_yolo.json'
     ANN: 'annotations/halpe_val_v1.json'
 DATA_PRESET:
@@ -55,9 +55,9 @@ DETECTOR:
   INP_DIM: 608
   NUM_CLASSES: 80
 TRAIN:
-  WORLD_SIZE: 4
-  BATCH_SIZE: 48
-  BEGIN_EPOCH: 5
+  WORLD_SIZE: 8
+  BATCH_SIZE: 96
+  BEGIN_EPOCH: 0
   END_EPOCH: 270
   OPTIMIZER: 'adam'
   LR: 0.001

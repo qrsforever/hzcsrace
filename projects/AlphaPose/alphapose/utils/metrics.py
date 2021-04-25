@@ -156,8 +156,9 @@ def calc_accuracy(preds, labels):
 def calc_integral_accuracy(preds, labels, label_masks, output_3d=False, norm_type='softmax'):
     """Calculate integral coordinates accuracy."""
     def integral_op(hm_1d):
-        hm_1d = hm_1d * torch.cuda.comm.broadcast(torch.arange(hm_1d.shape[-1]).type(
-            torch.cuda.FloatTensor), devices=[hm_1d.device.index])[0]
+        # QRS: no comm.broadcast for single gpu
+        # hm_1d = hm_1d * torch.cuda.comm.broadcast(torch.arange(hm_1d.shape[-1]).type(
+        #     torch.cuda.FloatTensor), devices=[hm_1d.device.index])[0]
         return hm_1d
 
     preds = preds.detach()

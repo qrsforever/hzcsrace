@@ -15,6 +15,10 @@ from alphapose.utils.logger import board_writing, debug_writing
 from alphapose.utils.metrics import DataLogger, calc_accuracy, calc_integral_accuracy, evaluate_mAP
 from alphapose.utils.transforms import get_func_heatmap_to_coord
 
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
+
 num_gpu = torch.cuda.device_count()
 valid_batch = 1 * num_gpu
 if opt.sync:
@@ -32,6 +36,8 @@ def train(opt, train_loader, m, criterion, optimizer, writer):
     train_loader = tqdm(train_loader, dynamic_ncols=True)
 
     for i, (inps, labels, label_masks, _, bboxes) in enumerate(train_loader):
+        # QRS
+        train_loader.sampler.set_epoch(i)
         if isinstance(inps, list):
             inps = [inp.cuda().requires_grad_() for inp in inps]
         else:
@@ -182,7 +188,13 @@ def main():
 
     # Model Initialize
     m = preset_model(cfg)
-    m = nn.DataParallel(m).cuda()
+    # QRS
+    if opt.rank == -1:
+        m = nn.DataParallel(m).cuda()
+    else:
+        dist.init_process_group(backend='nccl', init_method='env://')
+        torch.cuda.set_device(0)
+        m = DDP(m, device_ids=[0], output_device=0).cuda()
 
     criterion = builder.build_loss(cfg.LOSS).cuda()
 
@@ -197,12 +209,18 @@ def main():
     writer = SummaryWriter('{}/.tensorboard/{}'.format(opt.work_dir, cfg.FILE_NAME))
 
     train_dataset = builder.build_dataset(cfg.DATASET.TRAIN, preset_cfg=cfg.DATA_PRESET, train=True)
+    # QRS
+    sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if opt.rank != -1 else None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=cfg.TRAIN.BATCH_SIZE * num_gpu, shuffle=True, num_workers=opt.nThreads)
+        train_dataset, batch_size=cfg.TRAIN.BATCH_SIZE * num_gpu, shuffle=True, num_workers=opt.nThreads,
+        sampler=sampler)
 
     heatmap_to_coord = get_func_heatmap_to_coord(cfg)
 
     opt.trainIters = 0
+
+    ckpt_dir = os.path.join(opt.work_dir, cfg.FILE_NAME)
+    os.makedirs(ckpt_dir, exist_ok=True)
 
     for i in range(cfg.TRAIN.BEGIN_EPOCH, cfg.TRAIN.END_EPOCH):
         opt.epoch = i
@@ -218,7 +236,7 @@ def main():
 
         if (i + 1) % opt.snapshot == 0:
             # Save checkpoint
-            torch.save(m.module.state_dict(), '{}/{}/model_{}.pth'.format(opt.work_dir, cfg.FILE_NAME, opt.epoch))
+            torch.save(m.module.state_dict(), '{}/model_{}.pth'.format(ckpt_dir, opt.epoch))
             # Prediction Test
             with torch.no_grad():
                 gt_AP = validate_gt(m.module, opt, cfg, heatmap_to_coord)
@@ -227,7 +245,7 @@ def main():
 
         # Time to add DPG
         if i == cfg.TRAIN.DPG_MILESTONE:
-            torch.save(m.module.state_dict(), '{}/{}/final.pth'.format(opt.work_dir, cfg.FILE_NAME))
+            torch.save(m.module.state_dict(), '{}/final.pth'.format(ckpt_dir))
             # Adjust learning rate
             for param_group in optimizer.param_groups:
                 param_group['lr'] = cfg.TRAIN.LR
@@ -237,7 +255,10 @@ def main():
             train_loader = torch.utils.data.DataLoader(
                 train_dataset, batch_size=cfg.TRAIN.BATCH_SIZE * num_gpu, shuffle=True, num_workers=opt.nThreads)
 
-    torch.save(m.module.state_dict(), '{}/{}/final_DPG.pth'.format(opt.work_dir, cfg.FILE_NAME))
+    torch.save(m.module.state_dict(), '{}/final_DPG.pth'.format(ckpt_dir))
+
+    if opt.rank != -1:
+        dist.destroy_process_group()
 
 
 def preset_model(cfg):

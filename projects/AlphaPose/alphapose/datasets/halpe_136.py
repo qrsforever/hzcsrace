@@ -125,7 +125,7 @@ class Halpe_136(CustomDataset):
             xmin, ymin, xmax, ymax = bbox_clip_xyxy(bbox_xywh_to_xyxy(obj['bbox']), width, height)
             # require non-zero box area
             #if obj['area'] <= 0 or xmax <= xmin or ymax <= ymin:
-            if (xmax-xmin)*(ymax-ymin) <= 0 or xmax <= xmin or ymax <= ymini:
+            if (xmax-xmin)*(ymax-ymin) <= 0 or xmax <= xmin or ymax <= ymin:
                 continue
             if 'num_keypoints' in obj and obj['num_keypoints'] == 0:
                 continue
