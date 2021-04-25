@@ -212,7 +212,7 @@ def main():
     # QRS
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if opt.rank != -1 else None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=cfg.TRAIN.BATCH_SIZE * num_gpu, shuffle=True, num_workers=opt.nThreads,
+        train_dataset, batch_size=cfg.TRAIN.BATCH_SIZE * num_gpu, shuffle=False, num_workers=opt.nThreads,
         sampler=sampler)
 
     heatmap_to_coord = get_func_heatmap_to_coord(cfg)
