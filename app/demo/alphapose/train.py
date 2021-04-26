@@ -35,7 +35,9 @@ def train(opt, train_loader, m, criterion, optimizer, writer):
 
     train_loader_tqdm = tqdm(train_loader, dynamic_ncols=True)
 
-    for i, (inps, labels, label_masks, _, bboxes) in enumerate(train_loader_tqdm):
+    for i, (inps, labels, label_masks, imgids, bboxes) in enumerate(train_loader_tqdm):
+        print(imgids)
+        raise
         if isinstance(inps, list):
             inps = [inp.cuda().requires_grad_() for inp in inps]
         else:
