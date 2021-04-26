@@ -12,15 +12,15 @@ DATASET:
       PROB_HALF_BODY: 0.3
   VAL:
     TYPE: 'Halpe_136'
-    ROOT: '/raceai/data/datasets/halpe/'
-    IMG_PREFIX: 'hico_20160224_det/images/test2015'
+    ROOT: '/raceai/data/datasets/coco'
+    IMG_PREFIX: 'val2017'
     ANN: 'annotations/halpe_val_v1.json'
   TEST:
     TYPE: 'Halpe_136_det'
-    ROOT: '/raceai/data/datasets/halpe/'
-    IMG_PREFIX: 'hico_20160224_det/images/test2015'
-    DET_FILE: '/raceai/data/tmp/alphapose/json/test_det_yolo.json'
+    ROOT: '/raceai/data/datasets/coco'
+    IMG_PREFIX: 'val2017'
     ANN: 'annotations/halpe_val_v1.json'
+    DET_FILE: '/raceai/data/tmp/alphapose/json/test_det_yolo.json'
 DATA_PRESET:
   TYPE: 'simple'
   LOSS_TYPE: 'L1JointRegression'
