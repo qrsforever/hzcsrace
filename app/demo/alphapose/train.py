@@ -35,8 +35,7 @@ def train(opt, train_loader, m, criterion, optimizer, writer):
 
     train_loader_tqdm = tqdm(train_loader, dynamic_ncols=True)
 
-    for i, (inps, labels, label_masks, imgids, bboxes) in enumerate(train_loader_tqdm):
-        print(imgids)
+    for i, (inps, labels, label_masks, _, bboxes) in enumerate(train_loader_tqdm):
         raise
         if isinstance(inps, list):
             inps = [inp.cuda().requires_grad_() for inp in inps]
@@ -212,7 +211,8 @@ def main():
     # QRS
     sampler = torch.utils.data.distributed.DistributedSampler(train_dataset) if opt.rank != -1 else None
     train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=cfg.TRAIN.BATCH_SIZE * num_gpu, shuffle=False, num_workers=opt.nThreads,
+        train_dataset, batch_size=cfg.TRAIN.BATCH_SIZE * num_gpu,
+        shuffle=True if sampler is None else False, num_workers=opt.nThreads,
         sampler=sampler)
 
     heatmap_to_coord = get_func_heatmap_to_coord(cfg)
@@ -240,11 +240,12 @@ def main():
         if (i + 1) % opt.snapshot == 0:
             # Save checkpoint
             torch.save(m.module.state_dict(), '{}/model_{}.pth'.format(ckpt_dir, opt.epoch))
+            # QRS delete
             # Prediction Test
-            with torch.no_grad():
-                gt_AP = validate_gt(m.module, opt, cfg, heatmap_to_coord)
-                rcnn_AP = validate(m.module, opt, heatmap_to_coord)
-                logger.info(f'##### Epoch {opt.epoch} | gt mAP: {gt_AP} | rcnn mAP: {rcnn_AP} #####')
+            # with torch.no_grad():
+            #     gt_AP = validate_gt(m.module, opt, cfg, heatmap_to_coord)
+            #     rcnn_AP = validate(m.module, opt, heatmap_to_coord)
+            #     logger.info(f'##### Epoch {opt.epoch} | gt mAP: {gt_AP} | rcnn mAP: {rcnn_AP} #####')
 
         # Time to add DPG
         if i == cfg.TRAIN.DPG_MILESTONE:
