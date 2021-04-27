@@ -124,8 +124,12 @@ if __name__ == '__main__':
     Logger.info(opt)
 
     zmqsub.subscribe(opt.topic)
+    race_report_result('add_topic', opt.topic)
 
-    with torch.no_grad():
-        Logger.info('start yolo detect')
-        detect(opt)
-        Logger.info('never run here')
+    try:
+        with torch.no_grad():
+            Logger.info('start yolo detect')
+            detect(opt)
+            Logger.info('never run here')
+    finally:
+        race_report_result('del_topic', opt.topic)

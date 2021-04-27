@@ -84,9 +84,14 @@ if __name__ == '__main__':
     os.chdir("/tmp") # Workaround for `transcribe_file` make soft link in current directory
 
     zmqsub.subscribe(opt.topic)
+    race_report_result('add_topic', opt.topic)
+
     race_set_logfile(f'/tmp/raceai-{opt.topic}.log')
 
-    with torch.no_grad():
-        Logger.info('start speechbrain interence')
-        inference(opt)
-        Logger.info('never run here')
+    try:
+        with torch.no_grad():
+            Logger.info('start speechbrain interence')
+            inference(opt)
+            Logger.info('never run here')
+    finally:
+        race_report_result('del_topic', opt.topic)

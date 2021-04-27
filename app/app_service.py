@@ -29,6 +29,7 @@ app_logger = app.logger.info
 
 context = zmq.Context()
 zmqpub = context.socket(zmq.PUB)
+g_topics = []
 g_redis = None
 
 
@@ -61,6 +62,9 @@ def _framework_inference():
     ####
 
     if reqjson['task'].startswith('zmq'):
+        if reqjson['task'] not in g_topics:
+            app_logger(f"service topic:{reqjson['task']} is not start")
+            return json.dumps({'errno': -2})
         cfg = reqjson['cfg']
         if isinstance(cfg, str):
             cfg = json.loads(cfg)
@@ -73,16 +77,25 @@ def _framework_inference():
         return queue.get()
 
 
-@app.route('/raceai/private/pushmsg', methods=['POST'], endpoint='pushmsg')
+@app.route('/raceai/private/pushmsg', methods=['POST', 'GET'], endpoint='pushmsg')
 @catch_error
 @race_timeit(app_logger)
 def _framework_message_push():
     try:
-        if g_redis:
-            key = request.args.get("key", default='unknown')
-            app_logger(key)
-            g_redis.lpush(key, request.get_data().decode())
-            g_redis.expire(key, 432000) # 5 days
+        key = request.args.get("key", default='unknown')
+        val = request.get_data().decode()
+        if key == 'add_topic':
+            if val not in g_topics:
+                app_logger('add topic: %s' % val)
+                g_topics.append(val)
+        elif key == 'del_topic':
+            if val in g_topics:
+                app_logger('del topic: %s' % val)
+                g_topics.remove(val)
+        else:
+            if g_redis:
+                g_redis.lpush(key, val)
+                g_redis.expire(key, 432000) # 5 days
     except Exception as err:
         app_logger(err)
         return "-1"

@@ -101,10 +101,15 @@ if __name__ == '__main__':
 
     zmqsub.subscribe(opt.topic)
 
-    with torch.no_grad():
-        Logger.info('start pl')
-        classifer(opt)
-        Logger.info('never run here')
+    race_report_result('add_topic', opt.topic)
+
+    try:
+        with torch.no_grad():
+            Logger.info('start pl')
+            classifer(opt)
+            Logger.info('never run here')
+    finally:
+        race_report_result('del_topic', opt.topic)
 
 # test
 # cfg = '''{
