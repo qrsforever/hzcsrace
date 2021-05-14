@@ -86,17 +86,16 @@ class GlobalMaxPool(nn.Module):
         return x # (N, S, C)
 
 class TemproalSelfMatrix(nn.Module):
-    def __init__(self, temperature=13.544, device='cpu', m=2):
+    def __init__(self, temperature=13.544, m=2):
         super().__init__()
         self.temperature = temperature
-        self.device = device
         self.m = m
 
     def calc_sims(self, x):
         # (N, S, E)  --> (N, 1, S, S)
         S = x.shape[1]
 
-        I = torch.ones(S).to(self.device)
+        I = torch.ones(S).to(x.device)
         xr = torch.einsum('nse,h->nhse', (x, I))
         xc = torch.einsum('nse,h->nshe', (x, I))
         diff = xr - xc
@@ -111,7 +110,7 @@ class TemproalSelfMatrix(nn.Module):
         norm_b = torch.reshape(norm_b, [1, -1])
         b = torch.transpose(b, 0, 1)  # a: 64x512  b: 512x64
         zero_tensor = torch.zeros(64, 64)
-        dist = torch.maximum(norm_a - 2.0 * torch.matmul(a, b) + norm_b, torch.tensor(0.0).to(self.device))
+        dist = torch.maximum(norm_a - 2.0 * torch.matmul(a, b) + norm_b, torch.tensor(0.0).to(x.device))
         return dist
 
     def forward(self, x):
@@ -159,13 +158,13 @@ class FeaturesProjection(nn.Module):
 
 
 class PositionalEncoding(nn.Module):
-    def __init__(self, d_model, dropout=0.1, max_len=5000, device='cpu'):
+    def __init__(self, d_model, dropout=0.1, max_len=5000):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
 
-        pe = torch.zeros(max_len, d_model,  device=device)
-        position = torch.arange(0, max_len, dtype=torch.float, device=device).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2, device=device).float() * (-math.log(10000.0) / d_model))
+        pe = torch.zeros(max_len, d_model)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0).transpose(0, 1)
@@ -176,13 +175,13 @@ class PositionalEncoding(nn.Module):
         # (S, N, 512)
         x = x + self.pe[:x.size(0), :]
         return self.dropout(x)
+    
 
-
-class TransEncoder(nn.Module):
-    def __init__(self, num_frames=64, d_model=512,
+class TransformerModel(nn.Module):
+    def __init__(self, num_frames=64, d_model=512, 
                  n_head=4, dim_ff=512, dropout=0.2,
-                 num_layers=2, device='cpu'):
-        super(TransEncoder, self).__init__()
+                 num_layers=2):
+        super().__init__()
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
             nhead=n_head,
@@ -190,14 +189,12 @@ class TransEncoder(nn.Module):
             dropout=dropout,
             activation='relu')
         encoder_norm = nn.LayerNorm(d_model)
-
-        self.trans_encoder = nn.Sequential(
-            PositionalEncoding(d_model, 0.25, num_frames, device),
-            nn.TransformerEncoder(encoder_layer, num_layers, encoder_norm))
-
+        self.pos_encoder = PositionalEncoding(d_model, dropout, num_frames)
+        self.trans_encoder = nn.TransformerEncoder(encoder_layer, num_layers, encoder_norm)
+                
     def forward(self, x):
         x = x.transpose(0, 1)
-        x = self.trans_encoder(x)
+        x = self.pos_encoder(x)
         x = x.transpose(0, 1)
         return x
 
@@ -217,32 +214,37 @@ class PeriodClassifier(nn.Module):
 
 
 class RepNet(nn.Module):
-    def __init__(self, num_frames=64, num_dmodel=512, device='cpu'):
+    def __init__(self, num_frames=64, num_dmodel=512):
         super().__init__()
         ## Encoder
         self.resnet50 = ResNet50Base5D(pretrained=True)
         self.tcxt = TemporalContext()
-        self.maxpool = GlobalMaxPool()
+        self.maxpool = GlobalMaxPool(m=2)
         ## TSM
-        self.tsm = TemproalSelfMatrix(temperature=13.544, device=device)
+        self.tsm = TemproalSelfMatrix(temperature=13.544, m=2)
         ## Period Predictor
-        self.projection = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel)
+        self.projection = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel, dropout=0.0)
         ### period length prediction
-        self.trans1 = TransEncoder(num_frames, d_model=num_dmodel, n_head=4,
-                                   dropout=0.2, dim_ff=num_dmodel, device=device)
+        self.trans1 = TransformerModel(num_frames, d_model=num_dmodel, n_head=4,
+                                   dropout=0.1, dim_ff=num_dmodel)
         self.pc1 = PeriodClassifier(num_frames, num_dmodel)
         ### periodicity prediction
-        self.trans2 = TransEncoder(num_frames, d_model=num_dmodel, n_head=4,
-                                   dropout=0.2, dim_ff=num_dmodel, device=device)
+        self.trans2 = TransformerModel(num_frames, d_model=num_dmodel, n_head=4,
+                                   dropout=0.1, dim_ff=num_dmodel)
         self.pc2 = PeriodClassifier(num_frames, num_dmodel)
-
-    def forward(self, x):
+        
+    def forward(self, x, retsim=False):
         x = self.resnet50(x)
         x = self.tcxt(x)
         x = self.maxpool(x)
         x = self.tsm(x)
+        if retsim:
+            z = x
         x = self.projection(x)
-
+        
         y1 = self.pc1(self.trans1(x))
         y2 = self.pc2(self.trans2(x))
-        return y1, y2
+        if retsim:
+            return y1, y2, z
+        else:
+            return y1, y2
