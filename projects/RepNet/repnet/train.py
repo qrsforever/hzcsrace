@@ -91,18 +91,20 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
 
 def inference(device, model, pbar, metrics_callback=None):
     # TODO only one test
-    X, y1, y2, y3_true  = next(iter(pbar))
-    X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
-    y1_pred, y2_pred = model(X)
+    for X, y1, y2, y3_true in pbar:
+        X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+        y1_pred, y2_pred = model(X)
+        
+        y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
+        y3_calc = torch.round(torch.sum((y2 > 0) / (y1 + 1e-1), 1))
+        
+        if metrics_callback is not None:
+            metrics_callback(
+                y3_pred.cpu().numpy().flatten().astype(int).tolist(),
+                y3_calc.cpu().numpy().flatten().astype(int).tolist(),
+                y3_true.numpy().flatten().astype(int).tolist())
 
-    y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
-    y3_calc = torch.round(torch.sum((y2 > 0) / (y1 + 1e-1), 1))
-
-    if metrics_callback is not None:
-        metrics_callback(
-            y3_pred.cpu().numpy().flatten().astype(int).tolist(),
-            y3_calc.cpu().numpy().flatten().astype(int).tolist(),
-            y3_true.numpy().flatten().astype(int).tolist())
+        break
 
 
 def train_loop(opt, model, ckpt_path,
