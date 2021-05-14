@@ -39,10 +39,8 @@ CKPT_PATH = f'{DATASET_PREFIX}/last.pt'
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
     model.train()
     loss_list = []
-    for X, y1, y2, y3 in pbar:
-        X = X.to(device)
-        y1, y2, y3 = y1.to(device), y2.to(device), y3.to(device)
-
+    for X, y1, y2, _ in pbar:
+        X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
         y1_pred, y2_pred = model(X)
 
         loss1 = criterions[0](y1_pred, y1)
@@ -61,17 +59,15 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
                 '%.6f' % loss1.item(),
                 '%.6f' % loss2.item())
 
-        del X, y1, y2, y3, y1_pred, y2_pred
+        del X, y1, y2, y1_pred, y2_pred
     return np.mean(loss_list)
 
 
 def valid(device, model, pbar, criterions, metrics_callback=None):
     model.eval()
     loss_list = []
-    for X, y1, y2, y3 in pbar:
-        X = X.to(device)
-        y1, y2, y3 = y1.to(device), y2.to(device), y3.to(device)
-
+    for X, y1, y2, _ in pbar:
+        X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
         y1_pred, y2_pred = model(X)
 
         loss1 = criterions[0](y1_pred, y1)
@@ -85,7 +81,7 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
                 '%.6f' % loss1.item(),
                 '%.6f' % loss2.item())
 
-        del X, y1, y2, y3, y1_pred, y2_pred
+        del X, y1, y2, y1_pred, y2_pred
     return np.mean(loss_list)
 
 
@@ -152,7 +148,6 @@ def train_loop(opt, model, ckpt_path,
                 metrics_writer.write('Valid: {}\n'.format(pbar))
 
         # inference only one
-        test_loader.sampler.set_epoch(epoch)
         with torch.no_grad():
             with tqdm(test_loader, desc='Inference') as pbar:
                 inference(device, model, pbar,
@@ -193,6 +188,7 @@ def run_train(opt):
     train_dataset = CountixDataset(DATASET_PREFIX, 'train')
     valid_dataset = CountixDataset(DATASET_PREFIX, 'val')
     test_dataset = CountixDataset(DATASET_PREFIX, 'test')
+    test_loader = DataLoader(test_dataset, batch_size=5, num_workers=1, shuffle=False)
 
     if opt.local_rank == -1:
         train_loader = DataLoader(train_dataset, batch_size=opt.batch_size, num_workers=4, shuffle=True, drop_last=True)
@@ -206,9 +202,6 @@ def run_train(opt):
 
         valid_sampler = DistributedSampler(valid_dataset, shuffle=True)
         valid_loader = DataLoader(valid_dataset, batch_size=opt.batch_size, num_workers=4, sampler=valid_sampler)
-
-        test_sampler = DistributedSampler(test_dataset, shuffle=True)
-        test_loader = DataLoader(valid_dataset, batch_size=opt.batch_size, num_workers=4, sampler=test_sampler)
 
         model = DDP(model, device_ids=[opt.local_rank], output_device=opt.local_rank,
                 find_unused_parameters=True)
