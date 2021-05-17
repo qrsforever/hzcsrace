@@ -47,14 +47,14 @@ class CountixDataset(Dataset):
                 T.Resize(self.frame_size),
                 T.ToTensor(),
                 T.Normalize(mean=[0.485, 0.456, 0.406],
-                                    std=[0.229, 0.224, 0.225])])
+                    std=[0.229, 0.224, 0.225])])
             frames.append(trans(img).unsqueeze(0))
         cap.release()
 
         X = frames[:self.num_frames]
         X = torch.cat(X)
 
-        period_length = (end -start) / count
+        period_length = (end - start) / count
 
         y1 = np.full((self.num_frames, 1), fill_value=period_length)
         y2 = np.ones((self.num_frames, 1))

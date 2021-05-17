@@ -33,7 +33,8 @@ from torch.utils.data import DataLoader
 DATASET_PREFIX = '/data/datasets/cv/countix'
 NUM_FRAMES = 64
 NUM_DMODEL = 512
-CKPT_PATH = f'{DATASET_PREFIX}/last.pt'
+TAG = 2
+CKPT_PATH = f'{DATASET_PREFIX}/last{TAG}.pt'
 
 
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
@@ -46,7 +47,12 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         loss1 = criterions[0](y1_pred, y1)
         loss2 = criterions[1](y2_pred, y2)
 
-        loss = loss1 + 3*loss2
+        # count error
+        y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
+        y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
+        loss3 = criterions[0](y3_pred, y3_calc)
+
+        loss = 0.4*loss1 + 0.5*loss2 + 0.1*loss3
 
         optimizer.zero_grad()
         loss.backward()
@@ -55,9 +61,10 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
 
         if metrics_callback is not None:
             metrics_callback(
-                '%.6f' % np.mean(loss_list),
-                '%.6f' % loss1.item(),
-                '%.6f' % loss2.item())
+                '%.3f' % np.mean(loss_list),
+                '%.3f' % loss1.item(),
+                '%.3f' % loss2.item(),
+                '%.3f' % loss3.item())
 
         del X, y1, y2, y1_pred, y2_pred
     return np.mean(loss_list)
@@ -66,49 +73,58 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
 def valid(device, model, pbar, criterions, metrics_callback=None):
     model.eval()
     loss_list = []
-    for X, y1, y2, _ in pbar:
-        X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
-        y1_pred, y2_pred = model(X)
+    with torch.no_grad():
+        for X, y1, y2, _ in pbar:
+            X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+            y1_pred, y2_pred = model(X)
 
-        loss1 = criterions[0](y1_pred, y1)
-        loss2 = criterions[1](y2_pred, y2)
-        loss = loss1 + 3*loss2
-        loss_list.append(loss.item())
+            loss1 = criterions[0](y1_pred, y1)
+            loss2 = criterions[1](y2_pred, y2)
 
-        if metrics_callback is not None:
-            metrics_callback(
-                '%.6f' % np.mean(loss_list),
-                '%.6f' % loss1.item(),
-                '%.6f' % loss2.item())
+            y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
+            y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
+            loss3 = criterions[0](y3_pred, y3_calc)
 
-        del X, y1, y2, y1_pred, y2_pred
+            loss = 0.4*loss1 + 0.5*loss2 + 0.1*loss3
+            loss_list.append(loss.item())
+
+            if metrics_callback is not None:
+                metrics_callback(
+                    '%.3f' % np.mean(loss_list),
+                    '%.3f' % loss1.item(),
+                    '%.3f' % loss2.item(),
+                    '%.3f' % loss3.item())
+
+            del X, y1, y2, y1_pred, y2_pred
     return np.mean(loss_list)
 
 
 def inference(device, model, pbar, metrics_callback=None):
     # TODO only one test
-    for X, y1, y2, y3_true in pbar:
-        X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
-        y1_pred, y2_pred = model(X)
-        
-        y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
-        y3_calc = torch.round(torch.sum((y2 > 0) / (y1 + 1e-1), 1))
-        
-        if metrics_callback is not None:
-            metrics_callback(
-                y3_pred.cpu().numpy().flatten().astype(int).tolist(),
-                y3_calc.cpu().numpy().flatten().astype(int).tolist(),
-                y3_true.numpy().flatten().astype(int).tolist())
+    model.eval()
+    with torch.no_grad():
+        for X, y1, y2, y3_true in pbar:
+            X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+            y1_pred, y2_pred = model(X)
 
-        break
+            y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
+            y3_calc = torch.round(torch.sum((y2 > 0) / (y1 + 1e-1), 1))
+
+            if metrics_callback is not None:
+                metrics_callback(
+                        y3_pred.cpu().numpy().flatten().astype(int).tolist()[:5],
+                        y3_calc.cpu().numpy().flatten().astype(int).tolist()[:5],
+                        y3_true.numpy().flatten().astype(int).tolist()[:5])
+
+            break
 
 
 def train_loop(opt, model, ckpt_path,
                train_loader, valid_loader, test_loader,
                optimizer, scheduler, criterions, device):
 
-    metrics_writer = open(f'{DATASET_PREFIX}/metrics.json', 'w')
     start_epoch = 0
+    fmode = 'w+'
 
     # load model
     if ckpt_path and os.path.exists(ckpt_path):
@@ -117,51 +133,63 @@ def train_loop(opt, model, ckpt_path,
             model.module.load_state_dict(checkpoint['model_state_dict'], strict=True)
         else:
             model.load_state_dict(checkpoint['model_state_dict'], strict=True)
-        start_epoch = checkpoint['epoch']
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        for state in optimizer.state.values():
-            for k, v in state.items():
-                if isinstance(v, torch.Tensor):
-                    state[k] = v.to(device)
+
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        # for state in optimizer.state.values():
+        #     for k, v in state.items():
+        #         if isinstance(v, torch.Tensor):
+        #             state[k] = v.to(device)
+
+        start_epoch = checkpoint['epoch'] + 1
+        fmode = 'a+'
+
+    # metrics log
+    metrics_writer = open(f'{DATASET_PREFIX}/metrics{TAG}.json', fmode)
 
     lr = optimizer.param_groups[0]['lr']
 
     for epoch in tqdm(range(start_epoch, opt.num_epochs + start_epoch)):
         # train
-        train_loader.sampler.set_epoch(epoch)
+        if opt.local_rank != -1:
+            train_loader.sampler.set_epoch(epoch)
+            valid_loader.sampler.set_epoch(epoch)
+
         torch.cuda.empty_cache()
         with tqdm(train_loader, total=len(train_loader), desc='train') as pbar:
             train_loss = train(device, model, pbar, optimizer, criterions,
-                         lambda loss, loss1, loss2: pbar.set_postfix(
-                             epoch=epoch, lr=lr, loss=loss, loss1=loss1, loss2=loss2))
+                         lambda loss, loss1, loss2, loss3: pbar.set_postfix(
+                             epoch=epoch, lr=lr, loss=loss, loss1=loss1, loss2=loss2, loss3=loss3))
 
-            metrics_writer.write('Train: {}\n'.format(pbar))
+            metrics_writer.write('{}\n'.format(pbar))
 
         # valid
-        valid_loader.sampler.set_epoch(epoch)
         torch.cuda.empty_cache()
-        with torch.no_grad():
-            with tqdm(valid_loader, desc='valid') as pbar:
-                valid_loss = valid(device, model, pbar, criterions,
-                             lambda loss, loss1, loss2: pbar.set_postfix(
-                                 epoch=epoch, lr=lr, loss=loss, loss1=loss1, loss2=loss2))
-                metrics_writer.write('Valid: {}\n'.format(pbar))
+        with tqdm(valid_loader, desc='valid') as pbar:
+            valid_loss = valid(device, model, pbar, criterions,
+                         lambda loss, loss1, loss2, loss3: pbar.set_postfix(
+                             epoch=epoch, lr=lr, loss=loss, loss1=loss1, loss2=loss2, loss3=loss3))
+            metrics_writer.write('{}\n'.format(pbar))
 
-        # inference only one
-        with torch.no_grad():
-            with tqdm(test_loader, desc='Inference') as pbar:
-                inference(device, model, pbar,
-                          lambda y_pred, y_calc, y_true: pbar.set_postfix(
-                              y_pred=y_pred, y_calc=y_calc, y_true=y_true))
-                metrics_writer.write('Inference: {}\n'.format(pbar))
+        # inference
+        torch.cuda.empty_cache()
+        with tqdm(test_loader, desc='inference test') as pbar:
+            inference(device, model, pbar,
+                      lambda y_pred, y_calc, y_true: pbar.set_postfix(
+                          y_pred=y_pred, y_calc=y_calc, y_true=y_true))
+            metrics_writer.write('{}\n'.format(pbar))
+        with tqdm(train_loader, desc='inference train') as pbar:
+            inference(device, model, pbar,
+                      lambda y_pred, y_calc, y_true: pbar.set_postfix(
+                          y_pred=y_pred, y_calc=y_calc, y_true=y_true))
+            metrics_writer.write('{}\n'.format(pbar))
 
         # update learning rate
         if isinstance(scheduler, O.lr_scheduler.ReduceLROnPlateau):
-            scheduler.step(train_loss) # todo
-            lr = '%.8f' % scheduler._last_lr[0]
+            scheduler.step(valid_loss)
+            lr = '%.7f' % scheduler._last_lr[0]
         else:
             scheduler.step()
-            lr = '%.8f' % scheduler.get_last_lr()[0]
+            lr = '%.7f' % scheduler.get_last_lr()[0]
 
         metrics_writer.flush()
 
@@ -197,11 +225,11 @@ def run_train(opt):
         dist.init_process_group(backend='nccl', init_method='env://')
         torch.cuda.set_device(opt.local_rank)
         train_sampler = DistributedSampler(train_dataset, shuffle=True)
+        valid_sampler = DistributedSampler(valid_dataset, shuffle=False)
         train_loader = DataLoader(train_dataset, batch_size=opt.batch_size,
                 num_workers=4, drop_last=True, sampler=train_sampler)
-
-        valid_sampler = DistributedSampler(valid_dataset, shuffle=True)
-        valid_loader = DataLoader(valid_dataset, batch_size=opt.batch_size, num_workers=4, sampler=valid_sampler)
+        valid_loader = DataLoader(valid_dataset, batch_size=opt.batch_size,
+                num_workers=4, drop_last=True, sampler=valid_sampler)
 
         model = DDP(model, device_ids=[opt.local_rank], output_device=opt.local_rank,
                 find_unused_parameters=True)
@@ -213,10 +241,9 @@ def run_train(opt):
     # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
     # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
     #         3, 10, 50, 100, 200, 300, 400], gamma=0.6)
-    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=6, min_lr=1e-8)
-    loss_mae = nn.SmoothL1Loss()
-    loss_bce = nn.BCEWithLogitsLoss()
-    criterions = [loss_mae, loss_bce]
+    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.3, patience=5, min_lr=1e-6)
+    criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
+    # criterions = [nn.MSELoss(), nn.BCEWithLogitsLoss()]
 
     train_loop(opt, model, CKPT_PATH, \
                train_loader, valid_loader, test_loader, \
