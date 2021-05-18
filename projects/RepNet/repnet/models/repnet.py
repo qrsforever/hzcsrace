@@ -220,8 +220,11 @@ class PeriodClassifier(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(in_features=in_features, out_features=512),
             nn.LayerNorm(512),
+            nn.ReLU(),
             nn.Linear(in_features=512, out_features=num_frames//2),
-            nn.Linear(in_features=num_frames//2, out_features=1))
+            nn.ReLU(),
+            nn.Linear(in_features=num_frames//2, out_features=1),
+            nn.ReLU())
 
     def forward(self, x):
         x = self.classifier(x)
@@ -234,18 +237,18 @@ class RepNet(nn.Module):
         ## Encoder
         self.resnet50 = ResNet50Base5D(pretrained=True)
         self.tcxt = TemporalContext()
-        self.maxpool = GlobalMaxPool(m=2)
+        self.maxpool = GlobalMaxPool(m=1)
         ## TSM
-        self.tsm = TemproalSelfMatrix(num_frames=num_frames, temperature=13.544, m=2)
+        self.tsm = TemproalSelfMatrix(num_frames=num_frames, temperature=13.544, m=1)
         ## Period Predictor
         self.projection = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel, dropout=0.3)
         ### period length prediction
         self.trans1 = TransformerModel(num_frames, d_model=num_dmodel, n_head=4,
-                                   dropout=0.25, dim_ff=num_dmodel)
+                                   dropout=0.25, dim_ff=num_dmodel, m=1)
         self.pc1 = PeriodClassifier(num_frames, num_dmodel)
         ### periodicity prediction
         self.trans2 = TransformerModel(num_frames, d_model=num_dmodel, n_head=4,
-                                   dropout=0.25, dim_ff=num_dmodel)
+                                   dropout=0.25, dim_ff=num_dmodel, m=1)
         self.pc2 = PeriodClassifier(num_frames, num_dmodel)
 
     def forward(self, x, retsim=False):

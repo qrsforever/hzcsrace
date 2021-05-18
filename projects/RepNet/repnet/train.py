@@ -33,7 +33,7 @@ from torch.utils.data import DataLoader
 DATASET_PREFIX = '/data/datasets/cv/countix'
 NUM_FRAMES = 64
 NUM_DMODEL = 512
-TAG = 2
+TAG = 1
 CKPT_PATH = f'{DATASET_PREFIX}/last{TAG}.pt'
 
 
@@ -52,7 +52,7 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
         loss3 = criterions[0](y3_pred, y3_calc)
 
-        loss = 0.4*loss1 + 0.5*loss2 + 0.1*loss3
+        loss = 0.2*loss1 + 0.6*loss2 + 0.2*loss3
 
         optimizer.zero_grad()
         loss.backward()
@@ -85,7 +85,7 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
             y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
             loss3 = criterions[0](y3_pred, y3_calc)
 
-            loss = 0.4*loss1 + 0.5*loss2 + 0.1*loss3
+            loss = 0.2*loss1 + 0.6*loss2 + 0.2*loss3
             loss_list.append(loss.item())
 
             if metrics_callback is not None:
@@ -119,16 +119,19 @@ def inference(device, model, pbar, metrics_callback=None):
             break
 
 
-def train_loop(opt, model, ckpt_path,
+def train_loop(opt, model,
                train_loader, valid_loader, test_loader,
                optimizer, scheduler, criterions, device):
 
     start_epoch = 0
     fmode = 'w+'
 
+    ckpt_from_path = f'{DATASET_PREFIX}/last{opt.ckpt_from_tag}.pt'
+    ckpt_save_path = f'{DATASET_PREFIX}/last{opt.ckpt_save_tag}.pt'
+
     # load model
-    if ckpt_path and os.path.exists(ckpt_path):
-        checkpoint = torch.load(ckpt_path)
+    if os.path.exists(ckpt_from_path):
+        checkpoint = torch.load(ckpt_from_path)
         if opt.local_rank != -1:
             model.module.load_state_dict(checkpoint['model_state_dict'], strict=True)
         else:
@@ -144,7 +147,7 @@ def train_loop(opt, model, ckpt_path,
         fmode = 'a+'
 
     # metrics log
-    metrics_writer = open(f'{DATASET_PREFIX}/metrics{TAG}.json', fmode)
+    metrics_writer = open(f'{DATASET_PREFIX}/metrics{opt.ckpt_save_tag}.txt', fmode)
 
     lr = optimizer.param_groups[0]['lr']
 
@@ -194,7 +197,7 @@ def train_loop(opt, model, ckpt_path,
         metrics_writer.flush()
 
         # save model
-        if ckpt_path is not None:
+        if ckpt_save_path is not None:
             checkpoint = {
                 'epoch': epoch,
                 'model_state_dict': model.state_dict() if opt.local_rank == -1 else model.module.state_dict(),
@@ -202,7 +205,7 @@ def train_loop(opt, model, ckpt_path,
                 'train_loss': train_loss,
                 'valid_loss': valid_loss,
             }
-            torch.save(checkpoint, ckpt_path)
+            torch.save(checkpoint, ckpt_save_path)
 
     metrics_writer.close()
 
@@ -241,11 +244,11 @@ def run_train(opt):
     # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
     # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
     #         3, 10, 50, 100, 200, 300, 400], gamma=0.6)
-    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.3, patience=5, min_lr=1e-6)
+    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, patience=10, min_lr=1e-6)
     criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
     # criterions = [nn.MSELoss(), nn.BCEWithLogitsLoss()]
 
-    train_loop(opt, model, CKPT_PATH, \
+    train_loop(opt, model, \
                train_loader, valid_loader, test_loader, \
                optimizer, scheduler, criterions, device)
 
@@ -271,6 +274,18 @@ if __name__ == "__main__":
             default=10,
             type=int,
             dest='batch_size',
+            help="")
+    parser.add_argument(
+            '--ckpt_from_tag',
+            default=1,
+            type=int,
+            dest='ckpt_from_tag',
+            help="")
+    parser.add_argument(
+            '--ckpt_save_tag',
+            default=1,
+            type=int,
+            dest='ckpt_save_tag',
             help="")
 
     args = parser.parse_args()
