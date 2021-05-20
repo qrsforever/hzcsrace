@@ -10,7 +10,7 @@ cur_dir=`dirname $cur_fil`
 top_dir=`dirname $cur_dir`
 
 # master_addr=10.255.0.58
-master_addr=10.255.0.104
+master_addr=10.255.0.101
 master_port=8555
 nodes_num=1
 procs_num=1
@@ -122,14 +122,16 @@ __kill_resource
 
 if [[ x$ddp == xTrue ]]
 then
-	python3 -m torch.distributed.launch \
+	cmd="python3 -m torch.distributed.launch \
         --nproc_per_node=$procs_num --nnodes=$nodes_num --node=$node_index \
 		--master_addr $master_addr --master_port $master_port \
         $top_dir/repnet/train.py \
         --num_epochs $num_epochs \
         --batch_size $batch_size \
         --ckpt_from_tag $from_tag \
-        --ckpt_save_tag $save_tag
+        --ckpt_save_tag $save_tag"
+    echo $cmd
+    $cmd
 else
 	python3 $top_dir/repnet/train.py
 fi

@@ -15,7 +15,7 @@ import cv2
 from PIL import Image
 
 from torchvision import transforms as T
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 
 class CountixDataset(Dataset):
@@ -36,10 +36,6 @@ class CountixDataset(Dataset):
 
         path = f'{self.data_root}/{self.phase}/{item.file_name}'
 
-        period_length = (end - start) / count
-        if period_length < 2 or period_length > 32:
-            print(period_length, path)
-
         frames = []
         cap = cv2.VideoCapture(path)
         while cap.isOpened():
@@ -49,6 +45,7 @@ class CountixDataset(Dataset):
             img = Image.fromarray(frame)
             trans = T.Compose([
                 T.Resize(self.frame_size),
+                T.RandomRotation(20),
                 T.ToTensor(),
                 T.Normalize(mean=[0.485, 0.456, 0.406],
                     std=[0.229, 0.224, 0.225])])
@@ -58,14 +55,17 @@ class CountixDataset(Dataset):
         X = frames[:self.num_frames]
         X = torch.cat(X)
 
-        y1 = np.full((self.num_frames), fill_value=period_length-1)
+        period_length = (end -start) / count
+
+        y1 = np.full((self.num_frames, 1), fill_value=period_length)
         y2 = np.ones((self.num_frames, 1))
         for i in range(self.num_frames):
             if i < start or i > end:
                 y1[i] = 0
                 y2[i] = 0
 
-        y1 = torch.LongTensor(y1)
+        # y1 = torch.LongTensor(y1)
+        y1 = torch.FloatTensor(y1)
         y2 = torch.FloatTensor(y2)
         y3 = torch.FloatTensor([count])
         return X, y1, y2, y3

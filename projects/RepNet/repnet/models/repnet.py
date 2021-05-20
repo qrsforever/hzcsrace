@@ -136,19 +136,21 @@ class TemproalSelfMatrix(nn.Module):
         return F.relu(sims)  # (N, 1, S, S)
 
 
-class FeaturesProjection(nn.Module):
-    def __init__(self, num_frames=64, out_features=512):
-        super().__init__()
-        self.projection = nn.Sequential(
-            nn.Linear(num_frames*32, out_features),
-            nn.ReLU(),
-            nn.LayerNorm(out_features))
-
-    def forward(self, x):
-        x = x.permute(0, 2, 3, 1)
-        x = x.reshape(x.size(0), x.size(1), -1) # N, S, 32*S
-        x = self.projection(x) # N, S, 512
-        return x
+# class FeaturesProjection(nn.Module):
+#     def __init__(self, num_frames=64, out_features=512):
+#         super().__init__()
+#         self.num_frames = num_frames
+#         self.projection = nn.Sequential(
+#             nn.Linear(num_frames*32, out_features),
+#             nn.ReLU(),
+#             nn.LayerNorm(out_features))
+# 
+#     def forward(self, x):
+#         x = self.features(x)  # N, 32, S, S
+#         x = x.permute(0, 2, 3, 1)  # N, S, S, 32
+#         x = x.reshape(x.size(0), self.num_frames, -1)  # N, S, 32*S
+#         x = self.projection(x)  # N, S, 512
+#         return x
 
 
 class PositionalEncoding(nn.Module):
@@ -212,7 +214,10 @@ class PeriodClassifier(nn.Module):
             nn.LayerNorm(512),
             nn.ReLU(),
             nn.Dropout(p=0.25),
-            nn.Linear(in_features=512, out_features=out_features),
+            nn.Linear(in_features=512, out_features=num_frames//2),
+            nn.ReLU(),
+            nn.Dropout(p=0.25),
+            nn.Linear(in_features=num_frames//2, out_features=out_features),
             nn.ReLU())
 
     def forward(self, x):
@@ -240,20 +245,27 @@ class RepNet(nn.Module):
             nn.ReLU(),
             nn.Dropout(p=0.25))
 
-        self.projection1 = FeaturesProjection(num_frames, num_dmodel)
-        self.projection2 = FeaturesProjection(num_frames, num_dmodel)
+        self.projection1 = nn.Sequential(
+            nn.Linear(num_frames*32, num_dmodel),
+            nn.ReLU(),
+            nn.LayerNorm(num_dmodel))
+
+        self.projection2 = nn.Sequential(
+            nn.Linear(num_frames*32, num_dmodel),
+            nn.ReLU(),
+            nn.LayerNorm(num_dmodel))
 
         # period length prediction
         self.trans1 = TransformerModel(
                 num_frames, d_model=num_dmodel, n_head=4,
                 dropout=0.45, dim_ff=num_dmodel, m=1)
 
-        self.pc1 = PeriodClassifier(num_frames, num_dmodel, out_features=num_frames//2)
+        self.pc1 = PeriodClassifier(num_frames, num_dmodel)
         # periodicity prediction
         self.trans2 = TransformerModel(
                 num_frames, d_model=num_dmodel, n_head=4,
                 dropout=0.45, dim_ff=num_dmodel, m=1)
-        self.pc2 = PeriodClassifier(num_frames, num_dmodel, out_features=1)
+        self.pc2 = PeriodClassifier(num_frames, num_dmodel)
 
     def forward(self, x, retsim=False):
         x = self.resnet50(x)  # [N, 64, 1024, 7, 7]
@@ -262,7 +274,10 @@ class RepNet(nn.Module):
         x = self.tsm(x)  # [N, 1, 64, 64]
         if retsim:
             z = x
+
         x = self.tsm_features(x)  # [N, 32, 64, 64]
+        x = x.permute(0, 2, 3, 1)  # [N, 64, 64, 32]
+        x = x.reshape(x.size(0), x.size(1), -1)  # N, 64, 2048
 
         x1 = self.projection1(x)
         x2 = self.projection2(x)
