@@ -13,7 +13,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import models as M
-from torchvision import transforms as T
+from torchvision import transforms as T # noqa
 
 
 class ResNet50Base5D(nn.Module):
@@ -38,9 +38,9 @@ class ResNet50Base5D(nn.Module):
 
     def forward(self, x):
         N, S, C, H, W = x.shape
-        x = x.view(-1, C, H, W) # 5D -> 4D
+        x = x.view(-1, C, H, W)  # 5D -> 4D
         x = self.base_model(x)
-        x = x.view(N, S, x.shape[1], x.shape[2], x.shape[3]) # 4D -> 5D
+        x = x.view(N, S, x.shape[1], x.shape[2], x.shape[3])  # 4D -> 5D
         return x
 
 
@@ -49,11 +49,11 @@ class TemporalContext(nn.Module):
         super().__init__()
         self.conv3D = nn.Sequential(
             nn.Conv3d(
-                in_channels = in_channels,
-                out_channels = out_channels,
-                kernel_size = 3,
-                padding = 3,
-                dilation = 3),
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                padding=(1, 1, 1),
+                dilation=(1, 1, 1)),
             nn.BatchNorm3d(out_channels),
             nn.ReLU())
 
@@ -61,6 +61,7 @@ class TemporalContext(nn.Module):
         # (N, S, C, H, W) -> (N, C, S, H, W)
         x = x.transpose(1, 2)
         x = self.conv3D(x)
+        x = x.transpose(1, 2)
         return x
 
 
@@ -70,10 +71,10 @@ class GlobalMaxPool(nn.Module):
         self.m = m
 
         # method:2
-        self.pool = nn.MaxPool3d(kernel_size = (1, 7, 7))
+        self.pool = nn.MaxPool3d(kernel_size=(1, 7, 7))
 
     def forward(self, x):
-        # Inputs: (N, C, S, 7, 7)
+        # Inputs: (N, S, C, 7, 7)
         # method:1
         if self.m == 1:
             x, _ = torch.max(x, dim=4)
@@ -82,8 +83,8 @@ class GlobalMaxPool(nn.Module):
             # method:2
             x = self.pool(x).squeeze(-1).squeeze(-1)
 
-        x = x.transpose(1, 2)
-        return x # (N, S, C)
+        return x  # (N, S, C)
+
 
 class TemproalSelfMatrix(nn.Module):
     def __init__(self, num_frames=64, temperature=13.544, m=2):
@@ -96,9 +97,9 @@ class TemproalSelfMatrix(nn.Module):
 
     def calc_sims(self, x):
         # (N, S, E)  --> (N, 1, S, S)
-        S = x.shape[1]
+        # S = x.shape[1]
 
-        I = self.one_value # torch.ones(S).to(x.device)
+        I = self.one_value  # torch.ones(S).to(x.device)  # noqa
         xr = torch.einsum('nse,h->nhse', (x, I))
         xc = torch.einsum('nse,h->nshe', (x, I))
         diff = xr - xc
@@ -112,8 +113,9 @@ class TemproalSelfMatrix(nn.Module):
         norm_b = torch.sum(torch.square(b), dim=1)
         norm_b = torch.reshape(norm_b, [1, -1])
         b = torch.transpose(b, 0, 1)  # a: 64x512  b: 512x64
-        # dist = torch.maximum(norm_a - 2.0 * torch.matmul(a, b) + norm_b, torch.tensor(0.0).to(x.device))
-        dist = torch.maximum(norm_a - 2.0 * torch.matmul(a, b) + norm_b, self.zero_value)
+        dist = torch.maximum(
+                norm_a - 2.0 * torch.matmul(a, b) + norm_b,
+                self.zero_value)
         return dist
 
     def forward(self, x):
@@ -131,31 +133,20 @@ class TemproalSelfMatrix(nn.Module):
 
         sims = sims.unsqueeze(1)
         sims = F.softmax(-sims/self.temperature, dim=-1)
-        return F.relu(sims) # (N, 1, S, S)
+        return F.relu(sims)  # (N, 1, S, S)
 
 
 class FeaturesProjection(nn.Module):
-    def __init__(self, num_frames=64, out_features=512, dropout=0.2):
+    def __init__(self, num_frames=64, out_features=512):
         super().__init__()
-        self.num_frames = num_frames
-        self.out_features = out_features
-        self.features = nn.Sequential(
-            nn.Conv2d(in_channels=1,
-                      out_channels=32,
-                      kernel_size=3,
-                      padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.Dropout(p=dropout))
         self.projection = nn.Sequential(
             nn.Linear(num_frames*32, out_features),
             nn.ReLU(),
             nn.LayerNorm(out_features))
 
     def forward(self, x):
-        x = self.features(x) # N, 32, S, S
         x = x.permute(0, 2, 3, 1)
-        x = x.reshape(x.size(0), self.num_frames, -1) # N, S, 32*S
+        x = x.reshape(x.size(0), x.size(1), -1) # N, S, 32*S
         x = self.projection(x) # N, S, 512
         return x
 
@@ -167,12 +158,11 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))  # noqa
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0).transpose(0, 1)
         self.register_buffer('pe', pe)
-
 
     def forward(self, x):
         # (S, N, 512)
@@ -196,11 +186,10 @@ class TransformerModel(nn.Module):
         if m == 1:
             self.pos_encoder = PositionalEncoding(d_model, dropout, num_frames)
         else:
-            pos_encoder = torch.empty(1, num_frames, 1).normal_(mean=0, std=0.02)
+            pos_encoder = torch.empty(1, num_frames, 1).normal_(mean=0, std=0.02)  # noqa
             pos_encoder.requires_grad = True
-            self.register_buffer('pos_encoder', pos_encoder) # for device 'cuda'
-        self.trans_encoder = nn.TransformerEncoder(encoder_layer, num_layers, encoder_norm)
-
+            self.register_buffer('pos_encoder', pos_encoder)  # noqa for device 'cuda'
+        self.trans_encoder = nn.TransformerEncoder(encoder_layer, num_layers, encoder_norm)  # noqa
 
     def forward(self, x):
         if self.m == 1:
@@ -215,15 +204,15 @@ class TransformerModel(nn.Module):
 
 
 class PeriodClassifier(nn.Module):
-    def __init__(self, num_frames=64, in_features=512):
+    def __init__(self, num_frames=64, in_features=512, out_features=1):
         super().__init__()
         self.classifier = nn.Sequential(
+            nn.Dropout(p=0.25),
             nn.Linear(in_features=in_features, out_features=512),
             nn.LayerNorm(512),
             nn.ReLU(),
-            nn.Linear(in_features=512, out_features=num_frames//2),
-            nn.ReLU(),
-            nn.Linear(in_features=num_frames//2, out_features=1),
+            nn.Dropout(p=0.25),
+            nn.Linear(in_features=512, out_features=out_features),
             nn.ReLU())
 
     def forward(self, x):
@@ -234,34 +223,52 @@ class PeriodClassifier(nn.Module):
 class RepNet(nn.Module):
     def __init__(self, num_frames=64, num_dmodel=512):
         super().__init__()
-        ## Encoder
+        # Encoder
         self.resnet50 = ResNet50Base5D(pretrained=True)
         self.tcxt = TemporalContext()
         self.maxpool = GlobalMaxPool(m=1)
-        ## TSM
-        self.tsm = TemproalSelfMatrix(num_frames=num_frames, temperature=13.544, m=1)
-        ## Period Predictor
-        self.projection = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel, dropout=0.3)
-        ### period length prediction
-        self.trans1 = TransformerModel(num_frames, d_model=num_dmodel, n_head=4,
-                                   dropout=0.25, dim_ff=num_dmodel, m=1)
-        self.pc1 = PeriodClassifier(num_frames, num_dmodel)
-        ### periodicity prediction
-        self.trans2 = TransformerModel(num_frames, d_model=num_dmodel, n_head=4,
-                                   dropout=0.25, dim_ff=num_dmodel, m=1)
-        self.pc2 = PeriodClassifier(num_frames, num_dmodel)
+        # TSM
+        self.tsm = TemproalSelfMatrix(num_frames=num_frames, temperature=13.544, m=1)  # noqa
+
+        # Period Predictor
+        self.tsm_features = nn.Sequential(
+            nn.Conv2d(in_channels=1,
+                      out_channels=32,
+                      kernel_size=3,
+                      padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Dropout(p=0.25))
+
+        self.projection1 = FeaturesProjection(num_frames, num_dmodel)
+        self.projection2 = FeaturesProjection(num_frames, num_dmodel)
+
+        # period length prediction
+        self.trans1 = TransformerModel(
+                num_frames, d_model=num_dmodel, n_head=4,
+                dropout=0.45, dim_ff=num_dmodel, m=1)
+
+        self.pc1 = PeriodClassifier(num_frames, num_dmodel, out_features=num_frames//2)
+        # periodicity prediction
+        self.trans2 = TransformerModel(
+                num_frames, d_model=num_dmodel, n_head=4,
+                dropout=0.45, dim_ff=num_dmodel, m=1)
+        self.pc2 = PeriodClassifier(num_frames, num_dmodel, out_features=1)
 
     def forward(self, x, retsim=False):
-        x = self.resnet50(x)
-        x = self.tcxt(x)
-        x = self.maxpool(x)
-        x = self.tsm(x)
+        x = self.resnet50(x)  # [N, 64, 1024, 7, 7]
+        x = self.tcxt(x)  # [N, 64, 512, 7, 7]
+        x = self.maxpool(x)  # [N, 64, 512]
+        x = self.tsm(x)  # [N, 1, 64, 64]
         if retsim:
             z = x
-        x = self.projection(x)
+        x = self.tsm_features(x)  # [N, 32, 64, 64]
 
-        y1 = self.pc1(self.trans1(x)) # L
-        y2 = self.pc2(self.trans2(x)) # P
+        x1 = self.projection1(x)
+        x2 = self.projection2(x)
+
+        y1 = self.pc1(self.trans1(x1))  # L
+        y2 = self.pc2(self.trans2(x2))  # P
         if retsim:
             return y1, y2, z
         else:

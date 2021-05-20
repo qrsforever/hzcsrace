@@ -7,16 +7,12 @@
 # @version 1.0
 # @date 2021-05-12 14:32
 
-
-import os, math, json
+import os
 import argparse
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as O
+import torch.optim as O  # noqa
 import numpy as np
-from torchvision import models as M
-from torchvision import transforms as T
 
 from repnet.data.countix.dataset import CountixDataset
 from repnet.models.repnet import RepNet
@@ -44,15 +40,10 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
         y1_pred, y2_pred = model(X)
 
-        loss1 = criterions[0](y1_pred, y1)
+        loss1 = criterions[0](y1_pred.transpose(1, 2), y1)
         loss2 = criterions[1](y2_pred, y2)
 
-        # count error
-        y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
-        y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
-        loss3 = criterions[0](y3_pred, y3_calc)
-
-        loss = 0.2*loss1 + 0.6*loss2 + 0.2*loss3
+        loss = loss1 + 5*loss2
 
         optimizer.zero_grad()
         loss.backward()
@@ -63,8 +54,7 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
             metrics_callback(
                 '%.3f' % np.mean(loss_list),
                 '%.3f' % loss1.item(),
-                '%.3f' % loss2.item(),
-                '%.3f' % loss3.item())
+                '%.3f' % loss2.item())
 
         del X, y1, y2, y1_pred, y2_pred
     return np.mean(loss_list)
@@ -78,22 +68,17 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
             X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
             y1_pred, y2_pred = model(X)
 
-            loss1 = criterions[0](y1_pred, y1)
+            loss1 = criterions[0](y1_pred.transpose(1, 2), y1)
             loss2 = criterions[1](y2_pred, y2)
 
-            y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
-            y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
-            loss3 = criterions[0](y3_pred, y3_calc)
-
-            loss = 0.2*loss1 + 0.6*loss2 + 0.2*loss3
+            loss = loss1 + 5*loss2
             loss_list.append(loss.item())
 
             if metrics_callback is not None:
                 metrics_callback(
                     '%.3f' % np.mean(loss_list),
                     '%.3f' % loss1.item(),
-                    '%.3f' % loss2.item(),
-                    '%.3f' % loss3.item())
+                    '%.3f' % loss2.item())
 
             del X, y1, y2, y1_pred, y2_pred
     return np.mean(loss_list)
@@ -107,14 +92,13 @@ def inference(device, model, pbar, metrics_callback=None):
             X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
             y1_pred, y2_pred = model(X)
 
-            y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
-            y3_calc = torch.round(torch.sum((y2 > 0) / (y1 + 1e-1), 1))
+            t1_pred = y1_pred.argmax(dim=2, keepdim=True)
+            y3_pred = torch.round(torch.sum((y2_pred > 0) / (t1_pred + 1e-1), 1))
 
             if metrics_callback is not None:
                 metrics_callback(
-                        y3_pred.cpu().numpy().flatten().astype(int).tolist()[:5],
-                        y3_calc.cpu().numpy().flatten().astype(int).tolist()[:5],
-                        y3_true.numpy().flatten().astype(int).tolist()[:5])
+                        y3_pred.cpu().numpy().flatten().astype(int).tolist()[:8],
+                        y3_true.numpy().flatten().astype(int).tolist()[:8])
 
             break
 
@@ -127,7 +111,6 @@ def train_loop(opt, model,
     fmode = 'w+'
 
     ckpt_from_path = f'{DATASET_PREFIX}/last{opt.ckpt_from_tag}.pt'
-    ckpt_save_path = f'{DATASET_PREFIX}/last{opt.ckpt_save_tag}.pt'
 
     # load model
     if os.path.exists(ckpt_from_path):
@@ -160,8 +143,8 @@ def train_loop(opt, model,
         torch.cuda.empty_cache()
         with tqdm(train_loader, total=len(train_loader), desc='train') as pbar:
             train_loss = train(device, model, pbar, optimizer, criterions,
-                         lambda loss, loss1, loss2, loss3: pbar.set_postfix(
-                             epoch=epoch, lr=lr, loss=loss, loss1=loss1, loss2=loss2, loss3=loss3))
+                         lambda loss, loss1, loss2: pbar.set_postfix(
+                             epoch=epoch, lr=lr, loss=loss, loss1=loss1, loss2=loss2))
 
             metrics_writer.write('{}\n'.format(pbar))
 
@@ -169,21 +152,21 @@ def train_loop(opt, model,
         torch.cuda.empty_cache()
         with tqdm(valid_loader, desc='valid') as pbar:
             valid_loss = valid(device, model, pbar, criterions,
-                         lambda loss, loss1, loss2, loss3: pbar.set_postfix(
-                             epoch=epoch, lr=lr, loss=loss, loss1=loss1, loss2=loss2, loss3=loss3))
+                         lambda loss, loss1, loss2: pbar.set_postfix(
+                             epoch=epoch, lr=lr, loss=loss, loss1=loss1, loss2=loss2))
             metrics_writer.write('{}\n'.format(pbar))
 
         # inference
         torch.cuda.empty_cache()
         with tqdm(test_loader, desc='inference test') as pbar:
             inference(device, model, pbar,
-                      lambda y_pred, y_calc, y_true: pbar.set_postfix(
-                          y_pred=y_pred, y_calc=y_calc, y_true=y_true))
+                      lambda y_pred, y_true: pbar.set_postfix(
+                          y_pred=y_pred, y_true=y_true))
             metrics_writer.write('{}\n'.format(pbar))
         with tqdm(train_loader, desc='inference train') as pbar:
             inference(device, model, pbar,
-                      lambda y_pred, y_calc, y_true: pbar.set_postfix(
-                          y_pred=y_pred, y_calc=y_calc, y_true=y_true))
+                      lambda y_pred, y_true: pbar.set_postfix(
+                          y_pred=y_pred, y_true=y_true))
             metrics_writer.write('{}\n'.format(pbar))
 
         # update learning rate
@@ -197,15 +180,15 @@ def train_loop(opt, model,
         metrics_writer.flush()
 
         # save model
-        if ckpt_save_path is not None:
-            checkpoint = {
-                'epoch': epoch,
-                'model_state_dict': model.state_dict() if opt.local_rank == -1 else model.module.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'train_loss': train_loss,
-                'valid_loss': valid_loss,
-            }
-            torch.save(checkpoint, ckpt_save_path)
+        ckpt_save_path = f'{DATASET_PREFIX}/last{opt.ckpt_save_tag}_{lr}.pt'
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict() if opt.local_rank == -1 else model.module.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'train_loss': train_loss,
+            'valid_loss': valid_loss,
+        }
+        torch.save(checkpoint, ckpt_save_path)
 
     metrics_writer.close()
 
@@ -219,7 +202,7 @@ def run_train(opt):
     train_dataset = CountixDataset(DATASET_PREFIX, 'train')
     valid_dataset = CountixDataset(DATASET_PREFIX, 'val')
     test_dataset = CountixDataset(DATASET_PREFIX, 'test')
-    test_loader = DataLoader(test_dataset, batch_size=5, num_workers=1, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=opt.batch_size, num_workers=1, shuffle=False)
 
     if opt.local_rank == -1:
         train_loader = DataLoader(train_dataset, batch_size=opt.batch_size, num_workers=4, shuffle=True, drop_last=True)
@@ -244,16 +227,17 @@ def run_train(opt):
     # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
     # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
     #         3, 10, 50, 100, 200, 300, 400], gamma=0.6)
-    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.2, patience=10, min_lr=1e-6)
-    criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
-    # criterions = [nn.MSELoss(), nn.BCEWithLogitsLoss()]
+    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.8, patience=5, min_lr=1e-7)
+    # criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
+    criterions = [nn.CrossEntropyLoss(), nn.BCEWithLogitsLoss()]
 
-    train_loop(opt, model, \
-               train_loader, valid_loader, test_loader, \
+    train_loop(opt, model,
+               train_loader, valid_loader, test_loader,
                optimizer, scheduler, criterions, device)
 
     if opt.local_rank != -1:
         dist.destroy_process_group()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -278,13 +262,13 @@ if __name__ == "__main__":
     parser.add_argument(
             '--ckpt_from_tag',
             default=1,
-            type=int,
+            type=str,
             dest='ckpt_from_tag',
             help="")
     parser.add_argument(
             '--ckpt_save_tag',
             default=1,
-            type=int,
+            type=str,
             dest='ckpt_save_tag',
             help="")
 
