@@ -15,7 +15,7 @@ import cv2
 from PIL import Image
 
 from torchvision import transforms as T
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 
 class CountixDataset(Dataset):
@@ -45,7 +45,6 @@ class CountixDataset(Dataset):
             img = Image.fromarray(frame)
             trans = T.Compose([
                 T.Resize(self.frame_size),
-                T.RandomRotation(20),
                 T.ToTensor(),
                 T.Normalize(mean=[0.485, 0.456, 0.406],
                     std=[0.229, 0.224, 0.225])])
@@ -55,7 +54,7 @@ class CountixDataset(Dataset):
         X = frames[:self.num_frames]
         X = torch.cat(X)
 
-        period_length = (end -start) / count
+        period_length = (end - start) / count
 
         y1 = np.full((self.num_frames, 1), fill_value=period_length)
         y2 = np.ones((self.num_frames, 1))

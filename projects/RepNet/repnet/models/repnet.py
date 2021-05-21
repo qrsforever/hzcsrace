@@ -20,6 +20,7 @@ class ResNet50Base5D(nn.Module):
     def __init__(self, pretrained=False, m=2):
         super().__init__()
         base_model = M.resnet50(pretrained=pretrained)
+        self.m = m
 
         if m == 1:
             # method-1:
@@ -40,7 +41,10 @@ class ResNet50Base5D(nn.Module):
         N, S, C, H, W = x.shape
         x = x.view(-1, C, H, W)  # 5D -> 4D
         x = self.base_model(x)
-        x = x.view(N, S, x.shape[1], x.shape[2], x.shape[3])  # 4D -> 5D
+        if self.m == 1:
+            x = x.view(N, S, 1024, 7, 7)
+        else:
+            x = x.view(N, S, x.size(1), x.size(2), x.size(3))  # 4D -> 5
         return x
 
 
@@ -66,7 +70,7 @@ class TemporalContext(nn.Module):
 
 
 class GlobalMaxPool(nn.Module):
-    def __init__(self, m=2):
+    def __init__(self, m=1):
         super().__init__()
         self.m = m
 
@@ -77,17 +81,17 @@ class GlobalMaxPool(nn.Module):
         # Inputs: (N, S, C, 7, 7)
         # method:1
         if self.m == 1:
-            x, _ = torch.max(x, dim=4)
+            x, _ = torch.max(x, dim=3)
             x, _ = torch.max(x, dim=3)
         else:
             # method:2
-            x = self.pool(x).squeeze(-1).squeeze(-1)
+            x = self.pool(x).squeeze(3).squeeze(3)
 
         return x  # (N, S, C)
 
 
 class TemproalSelfMatrix(nn.Module):
-    def __init__(self, num_frames=64, temperature=13.544, m=2):
+    def __init__(self, num_frames=64, temperature=13.544, m=1):
         super().__init__()
         self.num_frames = num_frames
         self.temperature = temperature
@@ -136,21 +140,20 @@ class TemproalSelfMatrix(nn.Module):
         return F.relu(sims)  # (N, 1, S, S)
 
 
-# class FeaturesProjection(nn.Module):
-#     def __init__(self, num_frames=64, out_features=512):
-#         super().__init__()
-#         self.num_frames = num_frames
-#         self.projection = nn.Sequential(
-#             nn.Linear(num_frames*32, out_features),
-#             nn.ReLU(),
-#             nn.LayerNorm(out_features))
-# 
-#     def forward(self, x):
-#         x = self.features(x)  # N, 32, S, S
-#         x = x.permute(0, 2, 3, 1)  # N, S, S, 32
-#         x = x.reshape(x.size(0), self.num_frames, -1)  # N, S, 32*S
-#         x = self.projection(x)  # N, S, 512
-#         return x
+class FeaturesProjection(nn.Module):
+    def __init__(self, num_frames=64, out_features=512):
+        super().__init__()
+        self.projection = nn.Sequential(
+            nn.Linear(num_frames*32, out_features),
+            nn.ReLU(),
+            nn.LayerNorm(out_features))
+
+    def forward(self, x):
+        # [N, 32, S, S] -> [N, S, S, 32]
+        x = x.permute(0, 2, 3, 1)
+        x = x.reshape(x.size(0), x.size(1), -1) # N, S, 32*S
+        x = self.projection(x) # N, S, 512
+        return x
 
 
 class PositionalEncoding(nn.Module):
@@ -231,9 +234,9 @@ class RepNet(nn.Module):
         # Encoder
         self.resnet50 = ResNet50Base5D(pretrained=True)
         self.tcxt = TemporalContext()
-        self.maxpool = GlobalMaxPool(m=1)
+        self.maxpool = GlobalMaxPool()
         # TSM
-        self.tsm = TemproalSelfMatrix(num_frames=num_frames, temperature=13.544, m=1)  # noqa
+        self.tsm = TemproalSelfMatrix(num_frames=num_frames, temperature=13.544)  # noqa
 
         # Period Predictor
         self.tsm_features = nn.Sequential(
@@ -245,26 +248,19 @@ class RepNet(nn.Module):
             nn.ReLU(),
             nn.Dropout(p=0.25))
 
-        self.projection1 = nn.Sequential(
-            nn.Linear(num_frames*32, num_dmodel),
-            nn.ReLU(),
-            nn.LayerNorm(num_dmodel))
-
-        self.projection2 = nn.Sequential(
-            nn.Linear(num_frames*32, num_dmodel),
-            nn.ReLU(),
-            nn.LayerNorm(num_dmodel))
+        self.projection1 = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel)
+        # self.projection2 = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel)
 
         # period length prediction
         self.trans1 = TransformerModel(
                 num_frames, d_model=num_dmodel, n_head=4,
-                dropout=0.45, dim_ff=num_dmodel, m=1)
+                dropout=0.25, dim_ff=num_dmodel)
 
         self.pc1 = PeriodClassifier(num_frames, num_dmodel)
         # periodicity prediction
         self.trans2 = TransformerModel(
                 num_frames, d_model=num_dmodel, n_head=4,
-                dropout=0.45, dim_ff=num_dmodel, m=1)
+                dropout=0.25, dim_ff=num_dmodel)
         self.pc2 = PeriodClassifier(num_frames, num_dmodel)
 
     def forward(self, x, retsim=False):
@@ -276,14 +272,11 @@ class RepNet(nn.Module):
             z = x
 
         x = self.tsm_features(x)  # [N, 32, 64, 64]
-        x = x.permute(0, 2, 3, 1)  # [N, 64, 64, 32]
-        x = x.reshape(x.size(0), x.size(1), -1)  # N, 64, 2048
+        x = self.projection1(x)
 
-        x1 = self.projection1(x)
-        x2 = self.projection2(x)
+        y1 = self.pc1(self.trans1(x))  # L
+        y2 = self.pc2(self.trans2(x))  # P
 
-        y1 = self.pc1(self.trans1(x1))  # L
-        y2 = self.pc2(self.trans2(x2))  # P
         if retsim:
             return y1, y2, z
         else:

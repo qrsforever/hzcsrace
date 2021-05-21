@@ -8,15 +8,12 @@
 # @date 2021-05-12 14:32
 
 
-import os, math, json
+import os
 import argparse
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as O
 import numpy as np
-from torchvision import models as M
-from torchvision import transforms as T
+import torch.optim as O  # noqa
 
 from repnet.data.countix.dataset import CountixDataset
 from repnet.models.repnet import RepNet
@@ -33,8 +30,6 @@ from torch.utils.data import DataLoader
 DATASET_PREFIX = '/data/datasets/cv/countix'
 NUM_FRAMES = 64
 NUM_DMODEL = 512
-TAG = 1
-CKPT_PATH = f'{DATASET_PREFIX}/last{TAG}.pt'
 
 
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
@@ -58,6 +53,8 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         loss.backward()
         optimizer.step()
         loss_list.append(loss.item())
+
+        # nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
 
         if metrics_callback is not None:
             metrics_callback(
@@ -126,31 +123,29 @@ def train_loop(opt, model,
     start_epoch = 0
     fmode = 'w+'
 
-    ckpt_from_path = f'{DATASET_PREFIX}/last{opt.ckpt_from_tag}.pt'
-
     # load model
-    if os.path.exists(ckpt_from_path):
-        checkpoint = torch.load(ckpt_from_path)
+    if os.path.exists(opt.ckpt_from_path):
+        checkpoint = torch.load(opt.ckpt_from_path)
         if opt.local_rank != -1:
             model.module.load_state_dict(checkpoint['model_state_dict'], strict=True)
         else:
             model.load_state_dict(checkpoint['model_state_dict'], strict=True)
 
-        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        # for state in optimizer.state.values():
-        #     for k, v in state.items():
-        #         if isinstance(v, torch.Tensor):
-        #             state[k] = v.to(device)
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        for state in optimizer.state.values():
+            for k, v in state.items():
+                if isinstance(v, torch.Tensor):
+                    state[k] = v.to(device)
 
         start_epoch = checkpoint['epoch'] + 1
         fmode = 'a+'
 
     # metrics log
-    metrics_writer = open(f'{DATASET_PREFIX}/metrics{opt.ckpt_save_tag}.txt', fmode)
+    metrics_writer = open(f'{opt.data_root}/metrics.txt', fmode)
 
     lr = optimizer.param_groups[0]['lr']
 
-    for epoch in tqdm(range(start_epoch, opt.num_epochs + start_epoch)):
+    for epoch in tqdm(range(start_epoch, opt.num_epochs + start_epoch), ascii=True):
         # train
         if opt.local_rank != -1:
             train_loader.sampler.set_epoch(epoch)
@@ -196,7 +191,6 @@ def train_loop(opt, model,
         metrics_writer.flush()
 
         # save model
-        ckpt_save_path = f'{DATASET_PREFIX}/last{opt.ckpt_save_tag}_{lr}.pt'
         checkpoint = {
             'epoch': epoch,
             'model_state_dict': model.state_dict() if opt.local_rank == -1 else model.module.state_dict(),
@@ -204,7 +198,7 @@ def train_loop(opt, model,
             'train_loss': train_loss,
             'valid_loss': valid_loss,
         }
-        torch.save(checkpoint, ckpt_save_path)
+        torch.save(checkpoint, opt.ckpt_save_path)
 
     metrics_writer.close()
 
@@ -237,22 +231,22 @@ def run_train(opt):
                 find_unused_parameters=True)
 
     # hyper parameters
-    optimizer = O.Adam(model.parameters(), lr=0.0001)
+    optimizer = O.Adam(model.parameters(), lr=0.05)
     # optimizer = O.SGD(model.parameters(), lr=lr)
-    # scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
+    scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
     # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
     # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
     #         3, 10, 50, 100, 200, 300, 400], gamma=0.6)
-    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, min_lr=1e-7)
+    # scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-7)
     criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
-    # criterions = [nn.MSELoss(), nn.BCEWithLogitsLoss()]
 
-    train_loop(opt, model, \
-               train_loader, valid_loader, test_loader, \
+    train_loop(opt, model,
+               train_loader, valid_loader, test_loader,
                optimizer, scheduler, criterions, device)
 
     if opt.local_rank != -1:
         dist.destroy_process_group()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -275,16 +269,22 @@ if __name__ == "__main__":
             dest='batch_size',
             help="")
     parser.add_argument(
-            '--ckpt_from_tag',
-            default=1,
+            '--data_root',
+            default='/data/datasets/cv/countix',
             type=str,
-            dest='ckpt_from_tag',
+            dest='data_root',
             help="")
     parser.add_argument(
-            '--ckpt_save_tag',
-            default=1,
+            '--ckpt_from_path',
+            default='last.pt',
             type=str,
-            dest='ckpt_save_tag',
+            dest='ckpt_from_path',
+            help="")
+    parser.add_argument(
+            '--ckpt_save_path',
+            default='last.pt',
+            type=str,
+            dest='ckpt_save_path',
             help="")
 
     args = parser.parse_args()
