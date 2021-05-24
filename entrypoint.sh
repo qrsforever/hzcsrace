@@ -62,6 +62,11 @@ do
                 --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
                 --device 0
             ;;
+        "repnet")
+            python3 zmq/repnet_inference.py \
+                --weights /ckpts/repnet \
+                --topic zmq.repnet.inference
+            ;;
         *)
             echo "SS_MODULE set error"
             break;;
