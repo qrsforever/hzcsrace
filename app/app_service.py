@@ -71,7 +71,7 @@ def _framework_inference():
 
         if 'alphapose' in reqjson['task']:
             res = g_redis.get(reqjson['task'])
-            if res and res == 1:
+            if res and res.decode() == '1':
                 return json.dumps({'errno': -3})
             # TODO
             msgkey = cfg['pigeon']['msgkey']
@@ -102,7 +102,7 @@ def _framework_message_push():
                 app_logger('del topic: %s' % val)
                 g_topics.remove(val)
         elif key == 'zmp_run':
-            g_redis.getset(val, 1)
+            g_redis.getset(val, '1')
             g_redis.expire(val, 60)
         else:
             if g_redis:

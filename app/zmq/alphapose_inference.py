@@ -155,14 +155,14 @@ def result_report(resdata, res):
 
 
 def inference(pose_model, det_model, opt):
-    msgkey = opt.topic
+    msgkey = args.topic
     if 'msgkey' in opt.pigeon:
         msgkey = opt.pigeon.msgkey
     else:
         opt.pigeon.msgkey = msgkey
 
     user_code = 'unkown'
-    if 'user_code' not in opt.pigeon:
+    if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
 
     args.outputpath = os.path.join(args.outputpath, user_code)
@@ -191,7 +191,7 @@ def inference(pose_model, det_model, opt):
     if 'report_kps' in opt and opt['report_kps']:
         report_cb = result_report 
 
-    resdata = {'pigeon': dict(opt.pigeon), 'task': opt.topic, 'errno': 0}
+    resdata = {'pigeon': dict(opt.pigeon), 'task': args.topic, 'errno': 0}
 
     # Load detection loader
     det_loader = DetectionLoader(race_data(opt.video),
@@ -247,11 +247,11 @@ def inference(pose_model, det_model, opt):
                     boxes,scores,ids,hm,cropped_boxes = track(tracker,args,orig_img,inps,boxes,hm,cropped_boxes,im_name,scores)
                 hm = hm.cpu()
                 writer.save(boxes, scores, ids, hm, cropped_boxes, orig_img, im_name)
-                writer.resdata['progress'] = float(90 * (i + 1) / data_len)
                 Logger.info('[%d]/[%d]' % (i + 1, data_len))
-                if not _DEBUG_:
-                    race_report_result(msgkey, resdata)
-                if i % 100 == 50:
+                if i % 50 == 0:
+                    writer.resdata['progress'] = float(96 * (i + 1) / data_len)
+                    if not _DEBUG_:
+                        race_report_result(msgkey, resdata)
                     race_report_result('zmp_run', args.topic)
 
         print_finish_info()
@@ -264,9 +264,10 @@ def inference(pose_model, det_model, opt):
 
         if not _DEBUG_:
             writer.resdata['progress'] = 100.0
-            resdata['target_json'] = os.path.join(args.outputpath, 'alphapose-results.json')
+            prefix = 'https://raceai.s3.didiyunapi.com'
+            resdata['target_json'] = prefix + os.path.join(args.outputpath, 'alphapose-results.json')
             if args.save_video:
-                resdata['target_mp4'] = os.path.join(args.outputpath, 'alphapose-target.mp4')
+                resdata['target_mp4'] = prefix + os.path.join(args.outputpath, 'alphapose-target.mp4')
             race_object_put(osscli, args.outputpath, bucket_name='raceai')
             race_report_result(msgkey, resdata)
 
@@ -318,6 +319,7 @@ if __name__ == "__main__":
 
         if not _DEBUG_:
             while True:
+                Logger.info('wait task')
                 zmq_cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
                 zmq_cfg = OmegaConf.create(zmq_cfg)
                 Logger.info(zmq_cfg)
@@ -334,6 +336,8 @@ if __name__ == "__main__":
             zmq_cfg = OmegaConf.create(zmq_cfg)
             Logger.info(zmq_cfg)
             inference(pose_model, det_model, zmq_cfg)
+    except Exception:
+        pass
     finally:
         if not _DEBUG_:
             race_report_result('del_topic', args.topic)

@@ -4,3 +4,4 @@
 .pytorch-lightning
 .fnst/
 .AlphaPose
+.repnet-cli
