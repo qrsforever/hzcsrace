@@ -4,6 +4,7 @@ import os
 import platform
 import sys
 import time
+import zmq
 
 import numpy as np
 import torch
@@ -22,8 +23,21 @@ from alphapose.utils.vis import getTime
 from alphapose.utils.webcam_detector import WebCamDetectionLoader
 from alphapose.utils.writer import DataWriter
 
+from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)
+from raceai.utils.misc import race_report_result
+
+
+race_set_loglevel('info')
+race_set_logfile('/tmp/raceai-alphapose.log')
+
+context = zmq.Context()
+zmqsub = context.socket(zmq.SUB)
+zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
+
 """----------------------------- Demo options -----------------------------"""
 parser = argparse.ArgumentParser(description='AlphaPose Demo')
+parser.add_argument('--topic', type=str, required=True,
+                    help='zmq topic')
 parser.add_argument('--cfg', type=str, required=True,
                     help='experiment configure file name')
 parser.add_argument('--checkpoint', type=str, required=True,
@@ -145,10 +159,10 @@ def check_input():
 
 
 def print_finish_info():
-    print('===========================> Finish Model Running.')
+    Logger.info('===========================> Finish Model Running.')
     if (args.save_img or args.save_video) and not args.vis_fast:
-        print('===========================> Rendering remaining images in the queue...')
-        print('===========================> If this step takes too long, you can enable the --vis_fast flag to use fast rendering (real-time).')
+        Logger.info('===========================> Rendering remaining images in the queue...')
+        Logger.info('===========================> If this step takes too long, you can enable the --vis_fast flag to use fast rendering (real-time).')
 
 
 def loop():
@@ -158,27 +172,12 @@ def loop():
         n += 1
 
 
-if __name__ == "__main__":
-    mode, input_source = check_input()
-
-    if not os.path.exists(args.outputpath):
-        os.makedirs(args.outputpath)
-
-    # Load detection loader
-    if mode == 'webcam':
-        det_loader = WebCamDetectionLoader(input_source, get_detector(args), cfg, args)
-        det_worker = det_loader.start()
-    elif mode == 'detfile':
-        det_loader = FileDetectionLoader(input_source, cfg, args)
-        det_worker = det_loader.start()
-    else:
-        det_loader = DetectionLoader(input_source, get_detector(args), cfg, args, batchSize=args.detbatch, mode=mode, queueSize=args.qsize)
-        det_worker = det_loader.start()
+def inference(im_names_desc, det_loader, writer):
 
     # Load pose model
     pose_model = builder.build_sppe(cfg.MODEL, preset_cfg=cfg.DATA_PRESET)
 
-    print('Loading pose model from %s...' % (args.checkpoint,))
+    Logger.info('Loading pose model from %s...' % (args.checkpoint,))
     pose_model.load_state_dict(torch.load(args.checkpoint, map_location=args.device))
     pose_dataset = builder.retrieve_dataset(cfg.DATASET.TRAIN)
     if args.pose_track:
@@ -194,6 +193,75 @@ if __name__ == "__main__":
         'pt': [],
         'pn': []
     }
+
+    batchSize = args.posebatch
+    if args.flip:
+        batchSize = int(batchSize / 2)
+
+    for i in im_names_desc:
+        start_time = getTime()
+        with torch.no_grad():
+            (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
+            if orig_img is None:
+                break
+            if boxes is None or boxes.nelement() == 0:
+                writer.save(None, None, None, None, None, orig_img, im_name)
+                continue
+            if args.profile:
+                ckpt_time, det_time = getTime(start_time)
+                runtime_profile['dt'].append(det_time)
+            # Pose Estimation
+            inps = inps.to(args.device)
+            datalen = inps.size(0)
+            leftover = 0
+            if (datalen) % batchSize:
+                leftover = 1
+            num_batches = datalen // batchSize + leftover
+            hm = []
+            for j in range(num_batches):
+                inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)]
+                if args.flip:
+                    inps_j = torch.cat((inps_j, flip(inps_j)))
+                hm_j = pose_model(inps_j)
+                if args.flip:
+                    hm_j_flip = flip_heatmap(hm_j[int(len(hm_j) / 2):], pose_dataset.joint_pairs, shift=True)
+                    hm_j = (hm_j[0:int(len(hm_j) / 2)] + hm_j_flip) / 2
+                hm.append(hm_j)
+            hm = torch.cat(hm)
+            if args.profile:
+                ckpt_time, pose_time = getTime(ckpt_time)
+                runtime_profile['pt'].append(pose_time)
+            if args.pose_track:
+                boxes,scores,ids,hm,cropped_boxes = track(tracker,args,orig_img,inps,boxes,hm,cropped_boxes,im_name,scores)
+            hm = hm.cpu()
+            writer.save(boxes, scores, ids, hm, cropped_boxes, orig_img, im_name)
+            if args.profile:
+                ckpt_time, post_time = getTime(ckpt_time)
+                runtime_profile['pn'].append(post_time)
+
+    print_finish_info()
+
+
+if __name__ == "__main__":
+
+    race_report_result('add_topic', opt.topic)
+    zmqsub.subscribe(args.topic)
+
+    mode, input_source = check_input()
+
+    if not os.path.exists(args.outputpath):
+        os.makedirs(args.outputpath)
+
+    # Load detection loader
+    if mode == 'webcam':
+        det_loader = WebCamDetectionLoader(input_source, get_detector(args), cfg, args)
+        det_worker = det_loader.start()
+    elif mode == 'detfile':
+        det_loader = FileDetectionLoader(input_source, cfg, args)
+        det_worker = det_loader.start()
+    else:
+        det_loader = DetectionLoader(input_source, get_detector(args), cfg, args, batchSize=args.detbatch, mode=mode, queueSize=args.qsize)
+        det_worker = det_loader.start()
 
     # Init data writer
     queueSize = 2 if mode == 'webcam' else args.qsize
@@ -216,61 +284,11 @@ if __name__ == "__main__":
         data_len = det_loader.length
         im_names_desc = tqdm(range(data_len), dynamic_ncols=True)
 
-    batchSize = args.posebatch
-    if args.flip:
-        batchSize = int(batchSize / 2)
     try:
-        for i in im_names_desc:
-            start_time = getTime()
-            with torch.no_grad():
-                (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
-                if orig_img is None:
-                    break
-                if boxes is None or boxes.nelement() == 0:
-                    writer.save(None, None, None, None, None, orig_img, im_name)
-                    continue
-                if args.profile:
-                    ckpt_time, det_time = getTime(start_time)
-                    runtime_profile['dt'].append(det_time)
-                # Pose Estimation
-                inps = inps.to(args.device)
-                datalen = inps.size(0)
-                leftover = 0
-                if (datalen) % batchSize:
-                    leftover = 1
-                num_batches = datalen // batchSize + leftover
-                hm = []
-                for j in range(num_batches):
-                    inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)]
-                    if args.flip:
-                        inps_j = torch.cat((inps_j, flip(inps_j)))
-                    hm_j = pose_model(inps_j)
-                    if args.flip:
-                        hm_j_flip = flip_heatmap(hm_j[int(len(hm_j) / 2):], pose_dataset.joint_pairs, shift=True)
-                        hm_j = (hm_j[0:int(len(hm_j) / 2)] + hm_j_flip) / 2
-                    hm.append(hm_j)
-                hm = torch.cat(hm)
-                if args.profile:
-                    ckpt_time, pose_time = getTime(ckpt_time)
-                    runtime_profile['pt'].append(pose_time)
-                if args.pose_track:
-                    boxes,scores,ids,hm,cropped_boxes = track(tracker,args,orig_img,inps,boxes,hm,cropped_boxes,im_name,scores)
-                hm = hm.cpu()
-                writer.save(boxes, scores, ids, hm, cropped_boxes, orig_img, im_name)
-                if args.profile:
-                    ckpt_time, post_time = getTime(ckpt_time)
-                    runtime_profile['pn'].append(post_time)
-
-            if args.profile:
-                # TQDM
-                im_names_desc.set_description(
-                    'det time: {dt:.4f} | pose time: {pt:.4f} | post processing: {pn:.4f}'.format(
-                        dt=np.mean(runtime_profile['dt']), pt=np.mean(runtime_profile['pt']), pn=np.mean(runtime_profile['pn']))
-                )
-        print_finish_info()
+        inference(im_names_desc, det_loader, writer)
         while(writer.running()):
             time.sleep(1)
-            print('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...')
+            Logger.info('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...')
         writer.stop()
         det_loader.stop()
     except Exception as e:
@@ -284,7 +302,7 @@ if __name__ == "__main__":
             det_loader.terminate()
             while(writer.running()):
                 time.sleep(1)
-                print('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...')
+                Logger.info('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...')
             writer.stop()
         else:
             # subprocesses are killed, manually clear queues
@@ -293,4 +311,6 @@ if __name__ == "__main__":
             writer.terminate()
             writer.clear_queues()
             det_loader.clear_queues()
+    finally:
+        race_report_result('del_topic', args.topic)
 
