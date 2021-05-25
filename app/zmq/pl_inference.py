@@ -10,7 +10,6 @@
 
 import traceback
 import argparse
-import cv2
 import torch
 from torch.nn import functional as F
 from omegaconf import OmegaConf

@@ -32,7 +32,8 @@ ENV PYTHONPATH=/raceai/codes/app:/raceai/codes/projects/AlphaPose:$PYTHONPATH
 RUN $APT_INSTALL libyaml-dev locales
 RUN $PIP_INSTALL -U pip && \
         $PIP_INSTALL pycocotools==2.0.0 scipy==1.1.0 cython matplotlib \
-        six terminaltables visdom tqdm easydict pyyaml munkres timm==0.1.20 natsort
+        six terminaltables visdom tqdm easydict pyyaml munkres timm==0.1.20 natsort \
+        Minio
 
 RUN cd /raceai/codes/projects/AlphaPose && \
         python3 setup.py build develop --user

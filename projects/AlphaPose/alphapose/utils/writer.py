@@ -11,6 +11,7 @@ import torch.multiprocessing as mp
 from alphapose.utils.transforms import get_func_heatmap_to_coord
 from alphapose.utils.pPose_nms import pose_nms, write_json
 
+
 DEFAULT_VIDEO_SAVE_OPT = {
     'savepath': 'examples/res/1.mp4',
     'fourcc': cv2.VideoWriter_fourcc(*'mp4v'),
@@ -24,7 +25,9 @@ EVAL_JOINTS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 class DataWriter():
     def __init__(self, cfg, opt, save_video=False,
                  video_save_opt=DEFAULT_VIDEO_SAVE_OPT,
-                 queueSize=1024):
+                 queueSize=1024, result_callback=None, resdata=None):
+        self.result_callback = result_callback
+        self.resdata = resdata
         self.cfg = cfg
         self.opt = opt
         self.video_save_opt = video_save_opt
@@ -131,11 +134,13 @@ class DataWriter():
                     'result': _result
                 }
 
-
                 if self.opt.pose_flow:
                     poseflow_result = self.pose_flow_wrapper.step(orig_img, result)
                     for i in range(len(poseflow_result)):
                         result['result'][i]['idx'] = poseflow_result[i]['idx']
+
+                if self.result_callback:
+                    self.result_callback(self.resdata, result)
 
                 final_result.append(result)
                 if self.opt.save_img or self.save_video or self.opt.vis:

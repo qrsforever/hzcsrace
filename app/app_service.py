@@ -64,10 +64,19 @@ def _framework_inference():
     if reqjson['task'].startswith('zmq'):
         if reqjson['task'] not in g_topics:
             app_logger(f"service topic:{reqjson['task']} is not start")
-            return json.dumps({'errno': -2})
+            # return json.dumps({'errno': -2})
         cfg = reqjson['cfg']
         if isinstance(cfg, str):
             cfg = json.loads(cfg)
+
+        if 'alphapose' in reqjson['task']:
+            res = g_redis.get(reqjson['task'])
+            if res and res == 1:
+                return json.dumps({'errno': -3})
+            # TODO
+            msgkey = cfg['pigeon']['msgkey']
+            g_redis.delete(msgkey)
+
         zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(cfg, separators=(',',':'))))
         return json.dumps({'errno': 0})
 
@@ -92,10 +101,13 @@ def _framework_message_push():
             if val in g_topics:
                 app_logger('del topic: %s' % val)
                 g_topics.remove(val)
+        elif key == 'zmp_run':
+            g_redis.getset(val, 1)
+            g_redis.expire(val, 60)
         else:
             if g_redis:
                 g_redis.lpush(key, val)
-                g_redis.expire(key, 432000) # 5 days
+                g_redis.expire(key, 7200) # 5 days
     except Exception as err:
         app_logger(err)
         return "-1"

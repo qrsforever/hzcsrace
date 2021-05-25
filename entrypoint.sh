@@ -62,6 +62,13 @@ do
                 --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
                 --device 0
             ;;
+        "alphapose")
+            python3 zmq/alphapose_inference.py \
+            --cfg /configs/256x192_res50_lr1e-3_1x.yaml \
+            --topic zmq.alphapose.inference \
+            --checkpoint /ckpts/halpe26_fast_res50_256x192.pth \
+            --outdir /outputs
+            ;;
         "repnet")
             python3 zmq/repnet_inference.py \
                 --weights /ckpts/repnet \
