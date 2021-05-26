@@ -165,12 +165,14 @@ def inference(pose_model, det_model, opt):
     if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
 
-    args.outputpath = os.path.join(args.outputpath, user_code)
-    if not os.path.exists(args.outputpath):
-        os.makedirs(args.outputpath)
+    outputpath = os.path.join(args.outputpath, user_code)
+    if not os.path.exists(outputpath):
+        os.makedirs(outputpath)
 
     if 'qsize' in opt:
         args.qsize = opt.qsize
+    else:
+        args.qsize = 1024
 
     if 'save_img' in opt:
         args.save_img = opt.save_img
@@ -200,7 +202,7 @@ def inference(pose_model, det_model, opt):
 
     # Init data writer
     if args.save_video:
-        video_save_opt['savepath'] = os.path.join(args.outputpath, 'alphapose-target.mp4')
+        video_save_opt['savepath'] = os.path.join(outputpath, 'alphapose-target.mp4')
         video_save_opt.update(det_loader.videoinfo)
         writer = DataWriter(cfg, args, save_video=True,
                 video_save_opt=video_save_opt, queueSize=args.qsize,
@@ -265,10 +267,10 @@ def inference(pose_model, det_model, opt):
         if not _DEBUG_:
             writer.resdata['progress'] = 100.0
             prefix = 'https://raceai.s3.didiyunapi.com'
-            resdata['target_json'] = prefix + os.path.join(args.outputpath, 'alphapose-results.json')
+            resdata['target_json'] = prefix + os.path.join(outputpath, 'alphapose-results.json')
             if args.save_video:
-                resdata['target_mp4'] = prefix + os.path.join(args.outputpath, 'alphapose-target.mp4')
-            race_object_put(osscli, args.outputpath, bucket_name='raceai')
+                resdata['target_mp4'] = prefix + os.path.join(outputpath, 'alphapose-target.mp4')
+            race_object_put(osscli, outputpath, bucket_name='raceai')
             race_report_result(msgkey, resdata)
 
     except Exception as e:

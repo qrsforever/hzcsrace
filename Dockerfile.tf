@@ -42,13 +42,14 @@ RUN sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.d
         libjpeg-dev libpng-dev libavcodec-dev libavformat-dev libswscale-dev \
         libv4l-dev libxvidcore-dev libx264-dev libatlas-base-dev gfortran \
         libgl1-mesa-glx ffmpeg \
-        scipy matplotlib tqdm
         python3-dev python3-pip python3-setuptools python3-wheel \
         vim
 
 RUN $PIP_INSTALL -U pip && \
         $PIP_INSTALL scikit-build zmq protobuf pyhocon omegaconf && \
-        $PIP_INSTALL cython opencv-python opencv-contrib-python
+        $PIP_INSTALL cython opencv-python==4.3.0.36 opencv-contrib-python \
+        scipy==1.5.2 matplotlib tqdm==4.48.2 \
+        Minio
 
 SHELL ["/bin/bash"]
 COPY entrypoint.sh /entrypoint.sh

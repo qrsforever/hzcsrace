@@ -69,10 +69,10 @@ do
             --checkpoint /ckpts/halpe26_fast_res50_256x192.pth \
             --outdir /outputs
             ;;
-        "repnet")
-            python3 zmq/repnet_inference.py \
+        "repnet_tf")
+            python3 zmq/repnet_tf_inference.py \
                 --weights /ckpts/repnet \
-                --topic zmq.repnet.inference
+                --topic zmq.repnet_tf.inference
             ;;
         *)
             echo "SS_MODULE set error"
