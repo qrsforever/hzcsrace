@@ -3,6 +3,7 @@ import argparse
 import os
 import time
 import zmq
+import shutil
 
 import torch
 from tqdm import tqdm
@@ -166,8 +167,8 @@ def inference(pose_model, det_model, opt):
         user_code = opt.pigeon.user_code
 
     outputpath = os.path.join(args.outputpath, user_code)
-    if not os.path.exists(outputpath):
-        os.makedirs(outputpath)
+    shutil.rmtree(outputpath, ignore_errors=True)
+    os.makedirs(outputpath, exist_ok=True)
 
     if 'qsize' in opt:
         args.qsize = opt.qsize

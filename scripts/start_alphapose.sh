@@ -12,6 +12,7 @@ TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 VENDOR=hzcsai_com
 PROJECT=raceai_pose
 REPOSITORY="$VENDOR/$PROJECT"
+NAME=${PROJECT}-alphapose 
 
 minio_server_url='s3-internal.didiyunapi.com'
 minio_access_key='AKDD002E38WR1J7RMPTGRIGNVCVINY'
@@ -22,7 +23,7 @@ arg=""
 
 __start_raceai()
 {
-    docker run -d${arg} --runtime nvidia --name ${PROJECT}-alphapose \
+    docker run -d${arg} --runtime nvidia --name ${NAME} \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
         --env MINIO_SERVER_URL=$minio_server_url \
@@ -42,16 +43,10 @@ __start_raceai()
         $REPOSITORY $cmd
 }
 
-while getopts "dm:" OPT;
-do
-    case $OPT in
-        d)
-            arg="--restart unless-stopped"
-            ;;
-        *)
-            echo "arg error"
-            exit 0
-    esac
-done
+if [[ x$1 == x1 ]]
+then
+    docker container stop ${NAME} > /dev/null
+    docker container rm ${NAME} > /dev/null
+fi
 
 __start_raceai

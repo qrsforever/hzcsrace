@@ -61,7 +61,8 @@ def create_count_video(frames,
                        plot_count=True,
                        plot_within_period=False,
                        plot_score=False,
-                       vizualize_reps=False):
+                       vizualize_reps=False,
+                       progress_cb=None):
     """Creates video with running count and within period predictions.
 
   Args:
@@ -87,8 +88,9 @@ def create_count_video(frames,
         raise ValueError('Output format can only be mp4 or gif')
 
     if vizualize_reps:
-        viz_reps(frames, per_frame_counts, score, output_file, interval=delay, plot_score=plot_score)
-        return
+        return viz_reps(frames, per_frame_counts, score, output_file,
+                interval=delay, plot_score=plot_score,
+                progress_cb=progress_cb)
 
     num_frames = len(frames)
 
@@ -173,12 +175,16 @@ def create_count_video(frames,
             interval=delay,
             blit=False,
         )
+        outfile = ''
         if output_file[-3:] == 'mp4':
-            anim.save(f"{output_file[:-4]}_{final_count:02d}.mp4", dpi=100, fps=None)
+            outfile = f"{output_file[:-4]}_{final_count:02d}.mp4"
+            anim.save(outfile, dpi=100, fps=None)
         elif output_file[-3:] == 'gif':
-            anim.save(f"{output_file[:-4]}_{final_count:02d}.gif", writer='imagemagick', fps=None, dpi=100)
+            outfile = f"{output_file[:-4]}_{final_count:02d}.gif"
+            anim.save(outfile, writer='imagemagick', fps=None, dpi=100)
 
     plt.close()
+    return outfile 
 
 
 def get_counts(model, frames, strides, batch_size,
@@ -186,7 +192,7 @@ def get_counts(model, frames, strides, batch_size,
                within_period_threshold,
                constant_speed=False,
                median_filter=False,
-               fully_periodic=False):
+               fully_periodic=False, progress_cb=None):
     """Pass frames through model and conver period predictions to count."""
     seq_len = len(frames)
     raw_scores_list = []
@@ -198,7 +204,7 @@ def get_counts(model, frames, strides, batch_size,
 
     frames = model.preprocess(frames)
 
-    for stride in strides:
+    for i, stride in enumerate(strides, 1):
         num_batches = int(np.ceil(seq_len / model.num_frames / stride / batch_size))
         raw_scores_per_stride = []
         within_period_score_stride = []
@@ -217,6 +223,8 @@ def get_counts(model, frames, strides, batch_size,
                                                     [-1, model.num_frames // 2]))
             within_period_score_stride.append(np.reshape(within_period_scores.numpy(),
                                                          [-1, 1]))
+        if progress_cb:
+            progress_cb((100 * float(i)) / len(strides))
         raw_scores_per_stride = np.concatenate(raw_scores_per_stride, axis=0)
         raw_scores_list.append(raw_scores_per_stride)
         within_period_score_stride = np.concatenate(
@@ -301,7 +309,8 @@ def viz_reps(frames,
              colormap=plt.cm.PuBu,
              num_frames=None,
              interval=30,
-             plot_score=True):
+             plot_score=True,
+             progress_cb=None):
 
     """Visualize repetitions."""
     if isinstance(count, list):
@@ -391,6 +400,10 @@ def viz_reps(frames,
         ax.set_yticks([])
         plt.tight_layout()
 
+        if progress_cb:
+            if i % 100 == 0:
+                progress_cb((100 * i) / num_frames)
+
     anim = FuncAnimation(
         fig,
         update,
@@ -400,9 +413,13 @@ def viz_reps(frames,
 
     final_count = np.around(np.sum(counts)).astype(np.int)
 
+    outfile = ''
     if output_file[-3:] == 'mp4':
-        anim.save(f"{output_file[:-4]}_{final_count:02d}.mp4", dpi=100, fps=None)
+        outfile = f"{output_file[:-4]}_{final_count:02d}.mp4"
+        anim.save(outfile, dpi=100, fps=None)
     elif output_file[-3:] == 'gif':
-        anim.save(f"{output_file[:-4]}_{final_count:02d}.gif", writer='imagemagick', fps=None, dpi=100)
+        outfile = f"{output_file[:-4]}_{final_count:02d}.gif"
+        anim.save(outfile, writer='imagemagick', fps=None, dpi=100)
 
     plt.close()
+    return outfile 

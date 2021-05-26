@@ -9,8 +9,9 @@
 
 
 import argparse
-import time, os
+import time, os, json
 import zmq
+import shutil
 from utils import get_model, read_video
 from repnet import get_counts, create_count_video
 
@@ -34,10 +35,18 @@ osscli = race_oss_client(bucket_name='raceai')
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("path", type=str, help="Input video file path or root.")
-parser.add_argument("--topic", type=str, help="topic")
+parser.add_argument("--topic", type=str, default="a.b.c", help="topic")
 parser.add_argument("--out", default="/tmp/export", help="Output video file path or root")
 parser.add_argument("--ckpt", default="/tmp/weights", type=str, help="Checkpoint weights root.")
 main_args = parser.parse_args()
+
+
+def _report_result(msgkey, resdata):
+    if not _DEBUG_:
+        race_report_result(msgkey, resdata)
+        race_report_result('zmp_run', main_args.topic)
+    else:
+        pass
 
 
 def inference(model, opt):
@@ -71,13 +80,34 @@ def inference(model, opt):
     save_video = True
     if 'save_video' in opt:
         save_video = opt.save_video
-    viz_reps = True
-    if 'viz_reps' in opt:
-        viz_reps = opt.viz_reps
+    # viz_reps = True
+    # if 'viz_reps' in opt:
+    #     viz_reps = opt.viz_reps
 
-    outfile = os.path.join(main_args.out, user_code, 'target.mp4')
+    if save_video:
+        progress_strides_weight = 0.25
+    else:
+        progress_strides_weight = 0.95
 
-    frames, vid_fps = read_video(opt.video, rot=None)
+    resdata = {'pigeon': dict(opt.pigeon), 'task': main_args.topic, 'errno': 0}
+
+    outdir = os.path.join(main_args.out, user_code)
+    shutil.rmtree(outdir, ignore_errors=True)
+    os.makedirs(outdir, exist_ok=True)
+
+    resdata['progress'] = 1.0
+    _report_result(msgkey, resdata)
+    frames, vid_fps = read_video(race_data(opt.video), rot=None)
+    resdata['progress'] += 3.0
+    _report_result(msgkey, resdata)
+
+    def _model_strides_progress(x):
+        resdata['progress'] += x * progress_strides_weight
+        _report_result(msgkey, resdata)
+
+    def _video_save_progress(x):
+        resdata['progress'] += x * (1 - progress_strides_weight - 0.5)
+        _report_result(msgkey, resdata)
 
     s_time = time.time()
     (pred_period, pred_score,
@@ -90,19 +120,46 @@ def inference(model, opt):
             within_period_threshold=in_threshold,
             constant_speed=constant_speed,
             median_filter=median_filter,
-            fully_periodic=fully_periodic)
+            fully_periodic=fully_periodic,
+            progress_cb=_model_strides_progress)
     infer_time = time.time() - s_time
     Logger.info('model inference using time: %d' % infer_time)
 
+    Logger.info(pred_period)
+    Logger.info(pred_score)
+    Logger.info(within_period)
+    Logger.info(per_frame_counts)
+
+    json_result = {}
+    json_result['period'] = pred_period
+    json_result['score'] = pred_score
+    json_result['stride'] = chosen_stride
+    for in_period, p_count in zip(within_period, per_frame_counts):
+        pass
+
+    json_result_file = os.path.join(outdir, 'repnet_tf-results.json')
+    with open(json_result_file, 'w') as fw:
+        fw.write(json.dumps(json_result))
+
+    prefix = 'https://raceai.s3.didiyunapi.com'
     if save_video:
-        create_count_video(frames, per_frame_counts, within_period, score=pred_score,
-                fps=vid_fps, output_file=outfile, delay=1000 / vid_fps, vizualize_reps=viz_reps)
+        outfile = os.path.join(outdir, 'repnet_tf-target.mp4')
+        outfile = create_count_video(frames, per_frame_counts, within_period, score=pred_score,
+                fps=vid_fps, output_file=outfile, delay=1000 / vid_fps,
+                vizualize_reps=True, progress_cb=_video_save_progress)
+        resdata['target_mp4'] = prefix + outfile
+
+    if not _DEBUG_:
+        race_object_put(osscli, outdir, bucket_name='raceai')
+    resdata['progress'] = 100.0
+    resdata['target_json'] = prefix + json_result_file
+    _report_result(msgkey, resdata)
 
 
 if __name__ == "__main__":
     if not _DEBUG_:
-        race_report_result('add_topic', main_args.topic)
         zmqsub.subscribe(main_args.topic)
+    _report_result('add_topic', main_args.topic)
 
     try:
         # Load model
@@ -122,14 +179,15 @@ if __name__ == "__main__":
         else:
             zmq_cfg = {
                     "pigeon": {"msgkey": "123", "user_code": "123"},
-                    "video": "https://raceai.s3.didiyunapi.com/data/media/videos/repnet_test.mp4"
+                    "video": main_args.path,
+                    'save_video': False
             }
+            # "video": "https://raceai.s3.didiyunapi.com/data/media/videos/repnet_test.mp4"
             zmq_cfg = OmegaConf.create(zmq_cfg)
             Logger.info(zmq_cfg)
             inference(repnet_model, zmq_cfg)
-    except Exception:
-        pass
+    except Exception as err:
+        Logger.info(repr(err))
     finally:
-        if not _DEBUG_:
-            race_report_result('del_topic', main_args.topic)
+        _report_result('del_topic', main_args.topic)
         Logger.info('end')
