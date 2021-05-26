@@ -12,6 +12,8 @@ import argparse
 import time, os, json
 import zmq
 import shutil
+import numpy as np
+
 from utils import get_model, read_video
 from repnet import get_counts, create_count_video
 
@@ -102,11 +104,12 @@ def inference(model, opt):
     _report_result(msgkey, resdata)
 
     def _model_strides_progress(x):
-        resdata['progress'] += x * progress_strides_weight
+        resdata['progress'] = 4.0 + x * progress_strides_weight
+        Logger.info(resdata['progress'])
         _report_result(msgkey, resdata)
 
     def _video_save_progress(x):
-        resdata['progress'] += x * (1 - progress_strides_weight - 0.5)
+        resdata['progress'] = 24 + x * (1 - progress_strides_weight - 0.5)
         _report_result(msgkey, resdata)
 
     s_time = time.time()
@@ -125,21 +128,23 @@ def inference(model, opt):
     infer_time = time.time() - s_time
     Logger.info('model inference using time: %d' % infer_time)
 
-    Logger.info(pred_period)
-    Logger.info(pred_score)
-    Logger.info(within_period)
-    Logger.info(per_frame_counts)
-
     json_result = {}
     json_result['period'] = pred_period
-    json_result['score'] = pred_score
+    json_result['score'] = np.float(pred_score.numpy())
     json_result['stride'] = chosen_stride
+    json_result['fps'] = vid_fps
+    json_result['num_frames'] = len(frames)
+    frames_info = []
     for in_period, p_count in zip(within_period, per_frame_counts):
-        pass
+        frames_info.append({
+            'within_period': float(in_period),
+            'pframe_counts': float(p_count)
+        })
+    json_result['frames_period'] = frames_info
 
     json_result_file = os.path.join(outdir, 'repnet_tf-results.json')
     with open(json_result_file, 'w') as fw:
-        fw.write(json.dumps(json_result))
+        fw.write(json.dumps(json_result, indent=4))
 
     prefix = 'https://raceai.s3.didiyunapi.com'
     if save_video:
@@ -186,8 +191,6 @@ if __name__ == "__main__":
             zmq_cfg = OmegaConf.create(zmq_cfg)
             Logger.info(zmq_cfg)
             inference(repnet_model, zmq_cfg)
-    except Exception as err:
-        Logger.info(repr(err))
     finally:
         _report_result('del_topic', main_args.topic)
         Logger.info('end')
