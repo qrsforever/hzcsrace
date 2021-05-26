@@ -8,11 +8,11 @@
 # @date 2021-05-26 17:48
 
 
-from repnet import get_counts, create_count_video
 import argparse
-import zmq
 import time, os
+import zmq
 from utils import get_model, read_video
+from repnet import get_counts, create_count_video
 
 from omegaconf import OmegaConf
 from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)

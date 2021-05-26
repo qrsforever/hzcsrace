@@ -18,7 +18,7 @@ __start_raceai()
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
         --env TOPIC=zmq.repnet_tf.inference \
-        --env PYTHONPATH=/raceai/codes/projects/repnet-cli
+        --env PYTHONPATH=/raceai/codes/projects/repnet-cli \
         --volume /raceai/data:/raceai/data \
         --volume /raceai/data/ckpts/repnet_tf:/ckpts \
         --volume /raceai/data/users/outputs:/outputs \
