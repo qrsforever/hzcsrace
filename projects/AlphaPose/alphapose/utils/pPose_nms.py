@@ -574,5 +574,5 @@ def write_json(all_results, outputpath, form=None, for_eval=False):
                     json_file.write(json.dumps(json_results_cmu[name]))
     else:
         with open(os.path.join(outputpath,'alphapose-results.json'), 'w') as json_file:
-            json_file.write(json.dumps(json_results))
+            json_file.write(json.dumps(json_results, indent=4))
 

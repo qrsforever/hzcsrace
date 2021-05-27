@@ -35,7 +35,7 @@ __start_raceai()
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         --volume $TOP_DIR/projects/repnet-cli:/raceai/codes/projects/repnet-cli \
-        $REPOSITORY
+        $REPOSITORY -s repnet_tf
 }
 
 if [[ x$1 == x1 ]]

@@ -71,8 +71,9 @@ do
             ;;
         "repnet_tf")
             python3 zmq/repnet_tf_inference.py \
-                --weights /ckpts/repnet \
-                --topic zmq.repnet_tf.inference
+                --topic zmq.repnet_tf.inference \
+                --ckpt /ckpts \
+                --out /outputs
             ;;
         *)
             echo "SS_MODULE set error"

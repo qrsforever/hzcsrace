@@ -23,6 +23,11 @@ def get_repnet_model(logdir):
     # Models will be called in eval mode.
     tf.keras.backend.set_learning_phase(0)
 
+    # QRS
+    gpus = tf.config.experimental.list_physical_devices('GPU')
+    for gpu in gpus:
+        tf.config.experimental.set_memory_growth(gpu, True)
+
     # Define RepNet model.
     model = ResnetPeriodEstimator()
     # tf.function for speed.
@@ -224,7 +229,7 @@ def get_counts(model, frames, strides, batch_size,
             within_period_score_stride.append(np.reshape(within_period_scores.numpy(),
                                                          [-1, 1]))
         if progress_cb:
-            progress_cb((100 * float(i)) / len(strides))
+            progress_cb(round((100 * float(i)) / len(strides), 2))
         raw_scores_per_stride = np.concatenate(raw_scores_per_stride, axis=0)
         raw_scores_list.append(raw_scores_per_stride)
         within_period_score_stride = np.concatenate(
@@ -402,7 +407,7 @@ def viz_reps(frames,
 
         if progress_cb:
             if i % 100 == 0:
-                progress_cb((100 * i) / num_frames)
+                progress_cb(round((100 * float(i)) / num_frames, 2))
 
     anim = FuncAnimation(
         fig,

@@ -28,7 +28,7 @@ from raceai.utils.misc import ( # noqa
 race_set_loglevel('info')
 race_set_logfile('/tmp/raceai-repnet_tf.log')
 
-_DEBUG_ = True
+_DEBUG_ = False
 context = zmq.Context()
 zmqsub = context.socket(zmq.SUB)
 zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
@@ -36,7 +36,7 @@ zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
 osscli = race_oss_client(bucket_name='raceai')
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-parser.add_argument("path", type=str, help="Input video file path or root.")
+parser.add_argument("--path", default='', type=str, help="Input video file path or root.")
 parser.add_argument("--topic", type=str, default="a.b.c", help="topic")
 parser.add_argument("--out", default="/tmp/export", help="Output video file path or root")
 parser.add_argument("--ckpt", default="/tmp/weights", type=str, help="Checkpoint weights root.")
@@ -46,7 +46,7 @@ main_args = parser.parse_args()
 def _report_result(msgkey, resdata):
     if not _DEBUG_:
         race_report_result(msgkey, resdata)
-        race_report_result('zmp_run', main_args.topic)
+        race_report_result('zmp_run', f'{main_args.topic}:120')
     else:
         pass
 
@@ -66,10 +66,10 @@ def inference(model, opt):
         threshold = opt.threshold
     in_threshold = 0.5
     if 'in_threshold' in opt:
-        in_threshold = main_args.in_threshold
+        in_threshold = opt.in_threshold
     strides = [1, 2, 3, 4]
     if 'strides' in opt:
-        strides = opt.strides
+        strides = list(opt.strides)
     constant_speed = False
     if 'constant_speed' in opt:
         constant_speed = opt.constant_speed
@@ -109,7 +109,8 @@ def inference(model, opt):
         _report_result(msgkey, resdata)
 
     def _video_save_progress(x):
-        resdata['progress'] = 24 + x * (1 - progress_strides_weight - 0.5)
+        resdata['progress'] = 29 + x * (0.95 - progress_strides_weight)
+        Logger.info(resdata['progress'])
         _report_result(msgkey, resdata)
 
     s_time = time.time()
@@ -134,9 +135,11 @@ def inference(model, opt):
     json_result['stride'] = chosen_stride
     json_result['fps'] = vid_fps
     json_result['num_frames'] = len(frames)
+    json_result['infer_time'] = infer_time
     frames_info = []
-    for in_period, p_count in zip(within_period, per_frame_counts):
+    for i, (in_period, p_count) in enumerate(zip(within_period, per_frame_counts)):
         frames_info.append({
+            'image_id': '%d.jpg' % i,
             'within_period': float(in_period),
             'pframe_counts': float(p_count)
         })
@@ -152,6 +155,8 @@ def inference(model, opt):
         outfile = create_count_video(frames, per_frame_counts, within_period, score=pred_score,
                 fps=vid_fps, output_file=outfile, delay=1000 / vid_fps,
                 vizualize_reps=True, progress_cb=_video_save_progress)
+        mkvid_time = time.time() - s_time - infer_time
+        resdata['mkvideo_time'] = mkvid_time 
         resdata['target_mp4'] = prefix + outfile
 
     if not _DEBUG_:
@@ -164,7 +169,7 @@ def inference(model, opt):
 if __name__ == "__main__":
     if not _DEBUG_:
         zmqsub.subscribe(main_args.topic)
-    _report_result('add_topic', main_args.topic)
+        race_report_result('add_topic', main_args.topic)
 
     try:
         # Load model
@@ -173,7 +178,9 @@ if __name__ == "__main__":
         if not _DEBUG_:
             while True:
                 Logger.info('wait task')
+                race_report_result('zmp_end', main_args.topic)
                 zmq_cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
+                race_report_result('zmp_run', f'{main_args.topic}:30')
                 zmq_cfg = OmegaConf.create(zmq_cfg)
                 Logger.info(zmq_cfg)
                 if 'pigeon' not in zmq_cfg:
@@ -192,5 +199,6 @@ if __name__ == "__main__":
             Logger.info(zmq_cfg)
             inference(repnet_model, zmq_cfg)
     finally:
-        _report_result('del_topic', main_args.topic)
+        if _DEBUG_:
+            race_report_result('del_topic', main_args.topic)
         Logger.info('end')

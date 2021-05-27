@@ -130,6 +130,14 @@ def loop():
         n += 1
 
 
+def _report_result(msgkey, resdata):
+    if not _DEBUG_:
+        race_report_result(msgkey, resdata)
+        race_report_result('zmp_run', f'{args.topic}:120')
+    else:
+        pass
+
+
 def result_report(resdata, res):
     im_name = res['imgname']
     for human in res['result']:
@@ -152,7 +160,8 @@ def result_report(resdata, res):
         if 'idx' in human.keys():
             result['idx'] = human['idx']
         resdata['result'].append(result)
-        race_report_result(resdata['pigeon']['msgkey'], resdata)
+
+        _report_result(resdata['pigeon']['msgkey'], resdata)
 
 
 def inference(pose_model, det_model, opt):
@@ -253,15 +262,12 @@ def inference(pose_model, det_model, opt):
                 Logger.info('[%d]/[%d]' % (i + 1, data_len))
                 if i % 50 == 0:
                     writer.resdata['progress'] = float(96 * (i + 1) / data_len)
-                    if not _DEBUG_:
-                        race_report_result(msgkey, resdata)
-                    race_report_result('zmp_run', args.topic)
+                    _report_result(msgkey, resdata)
 
         print_finish_info()
         while(writer.running()):
             time.sleep(1)
             Logger.info('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...')
-            race_report_result('zmp_run', args.topic)
         writer.stop()
         det_loader.stop()
 
@@ -272,7 +278,7 @@ def inference(pose_model, det_model, opt):
             if args.save_video:
                 resdata['target_mp4'] = prefix + os.path.join(outputpath, 'alphapose-target.mp4')
             race_object_put(osscli, outputpath, bucket_name='raceai')
-            race_report_result(msgkey, resdata)
+            _report_result(msgkey, resdata)
 
     except Exception as e:
         Logger.info(repr(e))
@@ -300,8 +306,8 @@ def inference(pose_model, det_model, opt):
 if __name__ == "__main__":
 
     if not _DEBUG_:
-        race_report_result('add_topic', args.topic)
         zmqsub.subscribe(args.topic)
+        race_report_result('add_topic', args.topic)
 
     try:
         # Load model
@@ -323,7 +329,9 @@ if __name__ == "__main__":
         if not _DEBUG_:
             while True:
                 Logger.info('wait task')
+                race_report_result('zmp_end', args.topic)
                 zmq_cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
+                race_report_result('zmp_run', f'{args.topic}:30')
                 zmq_cfg = OmegaConf.create(zmq_cfg)
                 Logger.info(zmq_cfg)
                 if 'pigeon' not in zmq_cfg:
@@ -339,9 +347,7 @@ if __name__ == "__main__":
             zmq_cfg = OmegaConf.create(zmq_cfg)
             Logger.info(zmq_cfg)
             inference(pose_model, det_model, zmq_cfg)
-    except Exception:
-        pass
     finally:
-        if not _DEBUG_:
+        if _DEBUG_:
             race_report_result('del_topic', args.topic)
         Logger.info('end')

@@ -69,13 +69,12 @@ def _framework_inference():
         if isinstance(cfg, str):
             cfg = json.loads(cfg)
 
-        if 'alphapose' in reqjson['task']:
-            res = g_redis.get(reqjson['task'])
-            if res and res.decode() == '1':
-                return json.dumps({'errno': -3})
-            # TODO
-            msgkey = cfg['pigeon']['msgkey']
-            g_redis.delete(msgkey)
+        res = g_redis.get(reqjson['task'])
+        if res and res.decode() == '1':
+            return json.dumps({'errno': -3})
+        # TODO
+        msgkey = cfg['pigeon']['msgkey']
+        g_redis.delete(msgkey)
 
         zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(cfg, separators=(',',':'))))
         return json.dumps({'errno': 0})
@@ -102,12 +101,15 @@ def _framework_message_push():
                 app_logger('del topic: %s' % val)
                 g_topics.remove(val)
         elif key == 'zmp_run':
-            g_redis.getset(val, '1')
-            g_redis.expire(val, 60)
+            topic, secs = val.split(':')
+            g_redis.getset(topic, 1)
+            g_redis.expire(topic, secs)
+        elif key == 'zmp_end':
+            g_redis.delete(val)
         else:
             if g_redis:
                 g_redis.lpush(key, val)
-                g_redis.expire(key, 7200) # 5 days
+                g_redis.expire(key, 3600) # 1 days
     except Exception as err:
         app_logger(err)
         return "-1"
