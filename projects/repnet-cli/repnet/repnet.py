@@ -180,16 +180,13 @@ def create_count_video(frames,
             interval=delay,
             blit=False,
         )
-        outfile = ''
+
         if output_file[-3:] == 'mp4':
-            outfile = f"{output_file[:-4]}_{final_count:02d}.mp4"
-            anim.save(outfile, dpi=100, fps=None)
+            anim.save(output_file, dpi=100, fps=None)
         elif output_file[-3:] == 'gif':
-            outfile = f"{output_file[:-4]}_{final_count:02d}.gif"
-            anim.save(outfile, writer='imagemagick', fps=None, dpi=100)
+            anim.save(output_file, writer='imagemagick', fps=None, dpi=100)
 
     plt.close()
-    return outfile 
 
 
 def get_counts(model, frames, strides, batch_size,
@@ -416,15 +413,11 @@ def viz_reps(frames,
         interval=interval,
         blit=False)
 
-    final_count = np.around(np.sum(counts)).astype(np.int)
+    # final_count = np.around(np.sum(counts)).astype(np.int)
 
-    outfile = ''
     if output_file[-3:] == 'mp4':
-        outfile = f"{output_file[:-4]}_{final_count:02d}.mp4"
-        anim.save(outfile, dpi=100, fps=None)
+        anim.save(output_file, dpi=100, fps=None)
     elif output_file[-3:] == 'gif':
-        outfile = f"{output_file[:-4]}_{final_count:02d}.gif"
-        anim.save(outfile, writer='imagemagick', fps=None, dpi=100)
+        anim.save(output_file, writer='imagemagick', fps=None, dpi=100)
 
     plt.close()
-    return outfile 

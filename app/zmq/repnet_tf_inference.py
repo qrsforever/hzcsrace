@@ -137,27 +137,32 @@ def inference(model, opt):
     json_result['num_frames'] = len(frames)
     json_result['infer_time'] = infer_time
     frames_info = []
+    spf = 1 / vid_fps # time second for per frame
+    sum_counts = np.cumsum(per_frame_counts)
     for i, (in_period, p_count) in enumerate(zip(within_period, per_frame_counts)):
         frames_info.append({
             'image_id': '%d.jpg' % i,
+            'at_time': round((i + 1) * spf, 3),
             'within_period': float(in_period),
-            'pframe_counts': float(p_count)
+            'pframe_counts': float(p_count),
+            'cum_counts': sum_counts[i]
         })
     json_result['frames_period'] = frames_info
-
-    json_result_file = os.path.join(outdir, 'repnet_tf-results.json')
-    with open(json_result_file, 'w') as fw:
-        fw.write(json.dumps(json_result, indent=4))
 
     prefix = 'https://raceai.s3.didiyunapi.com'
     if save_video:
         outfile = os.path.join(outdir, 'repnet_tf-target.mp4')
-        outfile = create_count_video(frames, per_frame_counts, within_period, score=pred_score,
+        create_count_video(frames, per_frame_counts, within_period, score=pred_score,
                 fps=vid_fps, output_file=outfile, delay=1000 / vid_fps,
                 vizualize_reps=True, progress_cb=_video_save_progress)
         mkvid_time = time.time() - s_time - infer_time
-        resdata['mkvideo_time'] = mkvid_time 
+        json_result['mkvideo_time'] = mkvid_time 
+        json_result['target_mp4'] = prefix + outfile
         resdata['target_mp4'] = prefix + outfile
+
+    json_result_file = os.path.join(outdir, 'repnet_tf-results.json')
+    with open(json_result_file, 'w') as fw:
+        fw.write(json.dumps(json_result, indent=4))
 
     if not _DEBUG_:
         race_object_put(osscli, outdir, bucket_name='raceai')
