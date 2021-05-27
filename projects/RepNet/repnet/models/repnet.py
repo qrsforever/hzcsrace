@@ -56,8 +56,8 @@ class TemporalContext(nn.Module):
                 in_channels=in_channels,
                 out_channels=out_channels,
                 kernel_size=3,
-                padding=(1, 1, 1),
-                dilation=(1, 1, 1)),
+                padding=(3, 1, 1),
+                dilation=(3, 1, 1)),
             nn.BatchNorm3d(out_channels),
             nn.ReLU())
 
@@ -75,13 +75,14 @@ class GlobalMaxPool(nn.Module):
         self.m = m
 
         # method:2
-        self.pool = nn.MaxPool3d(kernel_size=(1, 7, 7))
+        if m == 2:
+            self.pool = nn.MaxPool3d(kernel_size=(1, 7, 7))
 
     def forward(self, x):
         # Inputs: (N, S, C, 7, 7)
         # method:1
         if self.m == 1:
-            x, _ = torch.max(x, dim=3)
+            x, _ = torch.max(x, dim=4)
             x, _ = torch.max(x, dim=3)
         else:
             # method:2
@@ -178,7 +179,7 @@ class PositionalEncoding(nn.Module):
 class TransformerModel(nn.Module):
     def __init__(self, num_frames=64, d_model=512,
                  n_head=4, dim_ff=512, dropout=0.2,
-                 num_layers=2, m=2):
+                 num_layers=2, m=1):
         super().__init__()
         self.m = m
         encoder_layer = nn.TransformerEncoderLayer(
@@ -212,14 +213,12 @@ class PeriodClassifier(nn.Module):
     def __init__(self, num_frames=64, in_features=512, out_features=1):
         super().__init__()
         self.classifier = nn.Sequential(
-            nn.Dropout(p=0.25),
+            nn.Dropout(p=0.2),
             nn.Linear(in_features=in_features, out_features=512),
             nn.LayerNorm(512),
             nn.ReLU(),
-            nn.Dropout(p=0.25),
             nn.Linear(in_features=512, out_features=num_frames//2),
             nn.ReLU(),
-            nn.Dropout(p=0.25),
             nn.Linear(in_features=num_frames//2, out_features=out_features),
             nn.ReLU())
 
@@ -248,19 +247,14 @@ class RepNet(nn.Module):
             nn.ReLU(),
             nn.Dropout(p=0.25))
 
-        self.projection1 = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel)
-        # self.projection2 = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel)
-
         # period length prediction
-        self.trans1 = TransformerModel(
-                num_frames, d_model=num_dmodel, n_head=4,
-                dropout=0.25, dim_ff=num_dmodel)
-
+        self.projection1 = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel)
+        self.trans1 = TransformerModel(num_frames, d_model=num_dmodel, dim_ff=num_dmodel)
         self.pc1 = PeriodClassifier(num_frames, num_dmodel)
+
         # periodicity prediction
-        self.trans2 = TransformerModel(
-                num_frames, d_model=num_dmodel, n_head=4,
-                dropout=0.25, dim_ff=num_dmodel)
+        self.projection2 = FeaturesProjection(num_frames=num_frames, out_features=num_dmodel)
+        self.trans2 = TransformerModel(num_frames, d_model=num_dmodel, dim_ff=num_dmodel)
         self.pc2 = PeriodClassifier(num_frames, num_dmodel)
 
     def forward(self, x, retsim=False):
@@ -272,10 +266,9 @@ class RepNet(nn.Module):
             z = x
 
         x = self.tsm_features(x)  # [N, 32, 64, 64]
-        x = self.projection1(x)
 
-        y1 = self.pc1(self.trans1(x))  # L
-        y2 = self.pc2(self.trans2(x))  # P
+        y1 = self.pc1(self.trans1(self.projection1(x)))  # L
+        y2 = self.pc2(self.trans2(self.projection2(x)))  # P
 
         if retsim:
             return y1, y2, z

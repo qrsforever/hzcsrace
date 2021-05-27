@@ -18,8 +18,9 @@ node_index=0
 batch_size=12
 num_epochs=2000
 ddp=False
-from_tag=1
-save_tag=1
+from_path=/tmp/last.pt
+save_path=/tmp/last.pt
+data_root=/data/datasets/cv/countix
 
 __usage() {
     echo ""
@@ -29,8 +30,9 @@ __usage() {
     echo "-p or --procs num"
     echo "-b or --bs batchsize"
     echo "-e or --epochs num epochs"
-    echo "-f or --fromtag ckpt from tag"
-    echo "-s or --savetag ckpt save tag"
+    echo "-d or --data_root  dataset root path"
+    echo "-f or --fromtag ckpt from"
+    echo "-s or --savetag ckpt save"
     echo "-h or --help"
     echo ""
 }
@@ -40,8 +42,9 @@ ARGUMENT_LIST=(
     "nodes"
     "procs"
     "epochs"
-    "fromtag"
-    "savetag"
+    "data_root"
+    "from_path"
+    "save_path"
     "bs"
 )
 
@@ -87,13 +90,18 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
 
-        -f|--fromtag)
-            from_tag=$2
+        -d|--data_root)
+            data_root=$2
             shift 2
             ;;
 
-        -s|--savetag)
-            save_tag=$2
+        -f|--from_path)
+            from_path=$2
+            shift 2
+            ;;
+
+        -s|--save_path)
+            save_path=$2
             shift 2
             ;;
 
@@ -128,8 +136,9 @@ then
         $top_dir/repnet/train.py \
         --num_epochs $num_epochs \
         --batch_size $batch_size \
-        --ckpt_from_tag $from_tag \
-        --ckpt_save_tag $save_tag"
+        --data_root $data_root \
+        --ckpt_from_path $from_path \
+        --ckpt_save_path $save_path"
     echo $cmd
     $cmd
 else

@@ -9,11 +9,13 @@
 
 
 import os
+import re
 import argparse
 import torch
 import torch.nn as nn
 import numpy as np
 import torch.optim as O  # noqa
+import shutil
 
 from repnet.data.countix.dataset import CountixDataset
 from repnet.models.repnet import RepNet
@@ -24,12 +26,14 @@ import torch.distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 
+from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
 
 DATASET_PREFIX = '/data/datasets/cv/countix'
 NUM_FRAMES = 64
 NUM_DMODEL = 512
+TENSORBOARD = True
 
 
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
@@ -47,7 +51,7 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
         loss3 = criterions[0](y3_pred, y3_calc)
 
-        loss = loss1 + 5*loss2 + loss3
+        loss = 3*loss1 + 10*loss2 + 2*loss3
 
         optimizer.zero_grad()
         loss.backward()
@@ -82,7 +86,8 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
             y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
             loss3 = criterions[0](y3_pred, y3_calc)
 
-            loss = loss1 + 5*loss2 + loss3
+            loss = 3*loss1 + 10*loss2 + 2*loss3
+
             loss_list.append(loss.item())
 
             if metrics_callback is not None:
@@ -122,6 +127,12 @@ def train_loop(opt, model,
 
     start_epoch = 0
     fmode = 'w+'
+
+    if TENSORBOARD:
+        log_dir = f'{opt.data_root}/output'
+        if os.path.exists(log_dir):
+            shutil.rmtree(log_dir, ignore_errors=True)
+        tb = SummaryWriter(log_dir=log_dir, comment='repnet')
 
     # load model
     if os.path.exists(opt.ckpt_from_path):
@@ -190,6 +201,19 @@ def train_loop(opt, model,
 
         metrics_writer.flush()
 
+        if TENSORBOARD:
+            for name, weight in model.module.named_parameters():
+                # check grad vanishing
+                if name in (
+                        'resnet50.base_model.4.0.conv1.weight',
+                        'tsm_features.0.weight',
+                        'projection1.projection.0.weight',
+                        'projection2.projection.0.weight',
+                        'trans1.trans_encoder.layers.0.linear1.weight') \
+                                or re.match(r'pc1\.[a-z]+\.\d.weight', name) is not None:
+                    tb.add_histogram(name, weight, epoch)
+                    tb.add_histogram(f'{name}.grad', weight.grad, epoch)
+
         # save model
         checkpoint = {
             'epoch': epoch,
@@ -202,8 +226,15 @@ def train_loop(opt, model,
 
     metrics_writer.close()
 
+    if TENSORBOARD:
+        tb.close()
+
 
 def run_train(opt):
+
+    torch.manual_seed(888)
+    torch.backends.cudnn.determinstic = True
+    torch.backends.cudnn.benchmark = False
 
     device = torch.device("cuda")
     model = RepNet(NUM_FRAMES, NUM_DMODEL).to(device)
@@ -231,13 +262,13 @@ def run_train(opt):
                 find_unused_parameters=True)
 
     # hyper parameters
-    optimizer = O.Adam(model.parameters(), lr=0.05)
+    optimizer = O.Adam(model.parameters(), lr=0.001)
     # optimizer = O.SGD(model.parameters(), lr=lr)
-    scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
+    # scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
     # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
     # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
     #         3, 10, 50, 100, 200, 300, 400], gamma=0.6)
-    # scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-7)
+    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-7)
     criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
 
     train_loop(opt, model,
