@@ -33,7 +33,7 @@ from torch.utils.data import DataLoader
 DATASET_PREFIX = '/data/datasets/cv/countix'
 NUM_FRAMES = 64
 NUM_DMODEL = 512
-TENSORBOARD = True
+TENSORBOARD = False
 
 
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
@@ -51,7 +51,7 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
         loss3 = criterions[0](y3_pred, y3_calc)
 
-        loss = 3*loss1 + 10*loss2 + 2*loss3
+        loss = loss1 + 5 * loss2 + loss3
 
         optimizer.zero_grad()
         loss.backward()
@@ -86,7 +86,7 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
             y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
             loss3 = criterions[0](y3_pred, y3_calc)
 
-            loss = 3*loss1 + 10*loss2 + 2*loss3
+            loss = loss1 + 5 * loss2 + loss3
 
             loss_list.append(loss.item())
 
@@ -142,11 +142,11 @@ def train_loop(opt, model,
         else:
             model.load_state_dict(checkpoint['model_state_dict'], strict=True)
 
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        for state in optimizer.state.values():
-            for k, v in state.items():
-                if isinstance(v, torch.Tensor):
-                    state[k] = v.to(device)
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        # for state in optimizer.state.values():
+        #     for k, v in state.items():
+        #         if isinstance(v, torch.Tensor):
+        #             state[k] = v.to(device)
 
         start_epoch = checkpoint['epoch'] + 1
         fmode = 'a+'
@@ -262,13 +262,14 @@ def run_train(opt):
                 find_unused_parameters=True)
 
     # hyper parameters
-    optimizer = O.Adam(model.parameters(), lr=0.001)
-    # optimizer = O.SGD(model.parameters(), lr=lr)
+    params = filter(lambda p: p.requires_grad, model.parameters())
+    optimizer = O.Adam(params, lr=0.001)
+    # optimizer = O.SGD(params, lr=lr)
     # scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
     # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
-    # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
-    #         3, 10, 50, 100, 200, 300, 400], gamma=0.6)
-    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-7)
+    scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
+        3, 10, 50, 100, 200, 300], gamma=0.7)
+    # scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-6)
     criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
 
     train_loop(opt, model,

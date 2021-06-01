@@ -8,7 +8,8 @@
 # @date 2021-05-12 14:11
 
 
-import os, io, math, base64
+import os
+import cv2
 import pandas as pd
 import subprocess
 import youtube_dl
@@ -29,6 +30,7 @@ YDL_OPTS = {
     'quiet': True,
     'max_filesize': 30000000, # 30MB
 }
+
 
 def video_download_crop(vid, fps, wh, ss, to, raw_dir, out_dir, force=False):
     raw_file = f'{raw_dir}/{vid}.mp4'
@@ -51,6 +53,7 @@ def video_download_crop(vid, fps, wh, ss, to, raw_dir, out_dir, force=False):
         return out_file
 
     return None
+
 
 def data_preprocess(data_prefix, phase, force=False):
     df = pd.read_csv(f'{data_prefix}/countix_{phase}.csv')

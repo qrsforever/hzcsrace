@@ -12,6 +12,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+# from torch.nn.utils import weight_norm as WN
 from torchvision import models as M
 from torchvision import transforms as T # noqa
 
@@ -19,7 +20,7 @@ from torchvision import transforms as T # noqa
 class ResNet50Base5D(nn.Module):
     def __init__(self, pretrained=False, m=2):
         super().__init__()
-        base_model = M.resnet50(pretrained=pretrained)
+        base_model = M.wide_resnet50_2(pretrained=pretrained)
         self.m = m
 
         if m == 1:
@@ -37,6 +38,12 @@ class ResNet50Base5D(nn.Module):
                 *list(base_model.children())[:-4],
                 *list(base_model.children())[-4][:3])
 
+        if pretrained:
+            for name, p in self.base_model.named_parameters():
+                # if name.startswith('conv'):
+                #     p.requires_grad = False
+                p.requires_grad = False
+
     def forward(self, x):
         N, S, C, H, W = x.shape
         x = x.view(-1, C, H, W)  # 5D -> 4D
@@ -44,7 +51,7 @@ class ResNet50Base5D(nn.Module):
         if self.m == 1:
             x = x.view(N, S, 1024, 7, 7)
         else:
-            x = x.view(N, S, x.size(1), x.size(2), x.size(3))  # 4D -> 5
+            x = x.view(N, S, x.size(1), x.size(2), x.size(3))  # 4D -> 5D
         return x
 
 
@@ -70,7 +77,7 @@ class TemporalContext(nn.Module):
 
 
 class GlobalMaxPool(nn.Module):
-    def __init__(self, m=1):
+    def __init__(self, m=2):
         super().__init__()
         self.m = m
 
@@ -110,9 +117,8 @@ class TemproalSelfMatrix(nn.Module):
         diff = xr - xc
         return torch.einsum('nsge,nsge->nsg', (diff, diff))
 
-    def pairwise_l2_distance(self, x):
+    def pairwise_l2_distance(self, a, b):
         # (S, E)
-        a, b = x, x
         norm_a = torch.sum(torch.square(a), dim=1)
         norm_a = torch.reshape(norm_a, [-1, 1])
         norm_b = torch.sum(torch.square(b), dim=1)
@@ -127,17 +133,16 @@ class TemproalSelfMatrix(nn.Module):
         # x: (N, S, E)
         # method: 1
         if self.m == 1:
-            # x = torch.transpose(x, 1, 2)
             sims_list = []
             for i in range(x.shape[0]):
-                sims_list.append(self.pairwise_l2_distance(x[i]))
+                sims_list.append(self.pairwise_l2_distance(x[i], x[i]))
             sims = torch.stack(sims_list)
         else:
             # method: 2
             sims = self.calc_sims(x)
 
         sims = sims.unsqueeze(1)
-        sims = F.softmax(-sims/self.temperature, dim=-1)
+        sims = F.softmax(-sims / self.temperature, dim=-1)
         return F.relu(sims)  # (N, 1, S, S)
 
 
@@ -145,13 +150,15 @@ class FeaturesProjection(nn.Module):
     def __init__(self, num_frames=64, out_features=512):
         super().__init__()
         self.projection = nn.Sequential(
-            nn.Linear(num_frames*32, out_features),
+            nn.Linear(num_frames * 32, out_features),
             nn.ReLU(),
             nn.LayerNorm(out_features))
 
     def forward(self, x):
         # [N, 32, S, S] -> [N, S, S, 32]
-        x = x.permute(0, 2, 3, 1)
+        # x = x.permute(0, 2, 3, 1)
+        # TODO 5.28
+        x = x.permute(0, 3, 2, 1)
         x = x.reshape(x.size(0), x.size(1), -1) # N, S, 32*S
         x = self.projection(x) # N, S, 512
         return x
@@ -178,23 +185,23 @@ class PositionalEncoding(nn.Module):
 
 class TransformerModel(nn.Module):
     def __init__(self, num_frames=64, d_model=512,
-                 n_head=4, dim_ff=512, dropout=0.2,
+                 n_head=4, dim_ff=512, dropout=0.3,
                  num_layers=2, m=1):
         super().__init__()
         self.m = m
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=n_head,
-            dim_feedforward=dim_ff,
-            dropout=dropout,
-            activation='relu')
-        encoder_norm = nn.LayerNorm(d_model)
         if m == 1:
             self.pos_encoder = PositionalEncoding(d_model, dropout, num_frames)
         else:
             pos_encoder = torch.empty(1, num_frames, 1).normal_(mean=0, std=0.02)  # noqa
             pos_encoder.requires_grad = True
             self.register_buffer('pos_encoder', pos_encoder)  # noqa for device 'cuda'
+        encoder_layer = nn.TransformerEncoderLayer(
+                d_model=d_model,
+                nhead=n_head,
+                dim_feedforward=dim_ff,
+                dropout=dropout,
+                activation='relu')
+        encoder_norm = None # nn.LayerNorm(d_model)
         self.trans_encoder = nn.TransformerEncoder(encoder_layer, num_layers, encoder_norm)  # noqa
 
     def forward(self, x):
@@ -217,9 +224,10 @@ class PeriodClassifier(nn.Module):
             nn.Linear(in_features=in_features, out_features=512),
             nn.LayerNorm(512),
             nn.ReLU(),
-            nn.Linear(in_features=512, out_features=num_frames//2),
+            nn.Dropout(p=0.2),
+            nn.Linear(in_features=512, out_features=num_frames // 2),
             nn.ReLU(),
-            nn.Linear(in_features=num_frames//2, out_features=out_features),
+            nn.Linear(in_features=num_frames // 2, out_features=out_features),
             nn.ReLU())
 
     def forward(self, x):
