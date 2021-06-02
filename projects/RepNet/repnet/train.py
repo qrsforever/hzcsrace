@@ -17,7 +17,7 @@ import numpy as np
 import torch.optim as O  # noqa
 import shutil
 
-from repnet.data.countix.dataset import CountixDataset
+from repnet.data.countix.dataset import CountixDataset, CountixSynthDataset
 from repnet.models.repnet import RepNet
 
 from tqdm import tqdm
@@ -30,10 +30,13 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
 
-DATASET_PREFIX = '/data/datasets/cv/countix'
+# DATASET_PREFIX = '/data/datasets/cv/countix'
+DATASET_PREFIX = '/data/datasets/cv/repnet_datasets'
 NUM_FRAMES = 64
 NUM_DMODEL = 512
+NUM_WORKERS = 8
 TENSORBOARD = False
+USE_SYNTHDATA = True
 
 
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
@@ -47,11 +50,12 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         loss2 = criterions[1](y2_pred, y2)
 
         # count error
-        y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
-        y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
-        loss3 = criterions[0](y3_pred, y3_calc)
+        # y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
+        # y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
+        # loss3 = criterions[0](y3_pred, y3_calc)
+        loss3 = torch.FloatTensor([0])
 
-        loss = loss1 + 5 * loss2 + loss3
+        loss = loss1 + 5 * loss2  # + loss3
 
         optimizer.zero_grad()
         loss.backward()
@@ -82,11 +86,12 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
             loss1 = criterions[0](y1_pred, y1)
             loss2 = criterions[1](y2_pred, y2)
 
-            y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
-            y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
-            loss3 = criterions[0](y3_pred, y3_calc)
+            # y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
+            # y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
+            # loss3 = criterions[0](y3_pred, y3_calc)
+            loss3 = torch.FloatTensor([0])
 
-            loss = loss1 + 5 * loss2 + loss3
+            loss = loss1 + 5 * loss2  # + loss3
 
             loss_list.append(loss.item())
 
@@ -240,35 +245,42 @@ def run_train(opt):
     model = RepNet(NUM_FRAMES, NUM_DMODEL).to(device)
 
     # data loader
-    train_dataset = CountixDataset(DATASET_PREFIX, 'train')
-    valid_dataset = CountixDataset(DATASET_PREFIX, 'val')
-    test_dataset = CountixDataset(DATASET_PREFIX, 'test')
+    if USE_SYNTHDATA:
+        train_dataset = CountixSynthDataset(DATASET_PREFIX, 'train')
+        valid_dataset = CountixSynthDataset(DATASET_PREFIX, 'val')
+        test_dataset = CountixSynthDataset(DATASET_PREFIX, 'test')
+    else:
+        train_dataset = CountixDataset(DATASET_PREFIX, 'train')
+        valid_dataset = CountixDataset(DATASET_PREFIX, 'val')
+        test_dataset = CountixDataset(DATASET_PREFIX, 'test')
     test_loader = DataLoader(test_dataset, batch_size=opt.batch_size, num_workers=1, shuffle=False)
 
     if opt.local_rank == -1:
-        train_loader = DataLoader(train_dataset, batch_size=opt.batch_size, num_workers=4, shuffle=True, drop_last=True)
-        valid_loader = DataLoader(valid_dataset, batch_size=opt.batch_size, num_workers=4, shuffle=False)
+        train_loader = DataLoader(train_dataset, batch_size=opt.batch_size,
+                num_workers=NUM_WORKERS, shuffle=True, drop_last=True)
+        valid_loader = DataLoader(valid_dataset, batch_size=opt.batch_size,
+                num_workers=NUM_WORKERS, shuffle=False)
     else:
         dist.init_process_group(backend='nccl', init_method='env://')
         torch.cuda.set_device(opt.local_rank)
         train_sampler = DistributedSampler(train_dataset, shuffle=True)
         valid_sampler = DistributedSampler(valid_dataset, shuffle=False)
         train_loader = DataLoader(train_dataset, batch_size=opt.batch_size,
-                num_workers=4, drop_last=True, sampler=train_sampler)
+                num_workers=NUM_WORKERS, drop_last=True, sampler=train_sampler)
         valid_loader = DataLoader(valid_dataset, batch_size=opt.batch_size,
-                num_workers=4, drop_last=True, sampler=valid_sampler)
+                num_workers=NUM_WORKERS, drop_last=True, sampler=valid_sampler)
 
         model = DDP(model, device_ids=[opt.local_rank], output_device=opt.local_rank,
                 find_unused_parameters=True)
 
     # hyper parameters
     params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = O.Adam(params, lr=0.001)
+    optimizer = O.Adam(params, lr=0.00006)
     # optimizer = O.SGD(params, lr=lr)
     # scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
-    # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=5, gamma=0.9)
-    scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
-        3, 10, 50, 100, 200, 300], gamma=0.7)
+    scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=50, gamma=0.9)
+    # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
+    #     3, 10, 15, 25, 50, 100, 200, 300], gamma=0.7)
     # scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-6)
     criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
 
