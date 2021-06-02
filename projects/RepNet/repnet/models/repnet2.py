@@ -90,7 +90,7 @@ class TransEncoder(nn.Module):
 
 
 class RepNet(nn.Module):
-    def __init__(self, num_frames):
+    def __init__(self, num_frames, num_dmodel=512):
         super(RepNet, self).__init__()
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
@@ -117,11 +117,11 @@ class RepNet(nn.Module):
         
         self.bn2 = nn.BatchNorm2d(32)
         self.dropout1 = nn.Dropout(0.25)
-        self.input_projection = nn.Linear(self.num_frames * 32, 512)
-        self.ln1 = nn.LayerNorm(512)
+        self.input_projection = nn.Linear(self.num_frames * 32, num_dmodel)
+        self.ln1 = nn.LayerNorm(num_dmodel)
         
-        self.transEncoder1 = TransEncoder(d_model=512, n_head=4, dropout = 0.2, dim_ff=512, num_layers = 1)
-        self.transEncoder2 = TransEncoder(d_model=512, n_head=4, dropout = 0.2, dim_ff=512, num_layers = 1)
+        self.transEncoder1 = TransEncoder(d_model=num_dmodel, n_head=4, dropout = 0.2, dim_ff=512, num_layers = 1)
+        self.transEncoder2 = TransEncoder(d_model=num_dmodel, n_head=4, dropout = 0.2, dim_ff=512, num_layers = 1)
         
         #period length prediction
         self.fc1_1 = nn.Linear(512, 512)
@@ -158,7 +158,6 @@ class RepNet(nn.Module):
         x = torch.cat([x1, x2], dim = 1)
         
         xret = x
-        print(xret.shape)
         
         x = F.relu(self.bn2(self.conv3x3(x)))     #batch, 32, num_frame, num_frame
         #print(x.shape)

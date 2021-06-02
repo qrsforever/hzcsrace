@@ -92,6 +92,10 @@ class CountixSynthDataset(Dataset):
         valid_paths = []
         for i in range(len(df_all)):
             vpath = f'{data_root}/{phase}vids/{phase}{i}.mp4'
+            count = df_all.loc[i, 'count'] 
+            if count > 32 or count < 2:
+                # print(vpath)
+                continue
             if osp.exists(vpath):
                 valid_index.append(i)
                 valid_paths.append(vpath)
@@ -155,7 +159,6 @@ class CountixSynthDataset(Dataset):
             Xlist.append(preprocess(img).unsqueeze(0))
 
         p_len = cvid_len / cvid_count
-        p_len = p_len if 1 < p_len < int(self.num_frames / 2) else 0
 
         y1 = np.full((self.num_frames, 1), fill_value=p_len)
         y2 = np.ones((self.num_frames, 1))

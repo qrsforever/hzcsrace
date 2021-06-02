@@ -18,7 +18,8 @@ import torch.optim as O  # noqa
 import shutil
 
 from repnet.data.countix.dataset import CountixDataset, CountixSynthDataset
-from repnet.models.repnet import RepNet
+# from repnet.models.repnet import RepNet
+from repnet.models.repnet2 import RepNet
 
 from tqdm import tqdm
 
@@ -50,12 +51,13 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         loss2 = criterions[1](y2_pred, y2)
 
         # count error
-        # y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
-        # y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
+        y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
+        y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
+        loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3_calc), (y3_calc + 1e-1)))
         # loss3 = criterions[0](y3_pred, y3_calc)
-        loss3 = torch.FloatTensor([0])
+        # loss3 = torch.FloatTensor([0])
 
-        loss = loss1 + 5 * loss2  # + loss3
+        loss = loss1 + 5 * loss2 + loss3
 
         optimizer.zero_grad()
         loss.backward()
@@ -86,12 +88,13 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
             loss1 = criterions[0](y1_pred, y1)
             loss2 = criterions[1](y2_pred, y2)
 
-            # y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
-            # y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
+            y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
+            y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
+            loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3_calc), (y3_calc + 1e-1)))
             # loss3 = criterions[0](y3_pred, y3_calc)
-            loss3 = torch.FloatTensor([0])
+            # loss3 = torch.FloatTensor([0])
 
-            loss = loss1 + 5 * loss2  # + loss3
+            loss = loss1 + 5 * loss2 + loss3
 
             loss_list.append(loss.item())
 
