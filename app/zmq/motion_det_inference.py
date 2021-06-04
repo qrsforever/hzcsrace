@@ -24,6 +24,7 @@ def get_background(file_path):
         cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
         ret, frame = cap.read()
         frames.append(frame)
+    cap.release()
     # calculate the median
     median_frame = np.median(frames, axis=0).astype(np.uint8)
     return median_frame
@@ -36,18 +37,22 @@ def detect(args):
     save_name = f"/raceai/data/tmp/{args['input'].split('/')[-1]}"
     out = cv2.VideoWriter(
         save_name,
-        cv2.VideoWriter_fourcc(*'mp4v'), 10, 
+        cv2.VideoWriter_fourcc(*'mp4v'), 30, 
         (frame_width, frame_height)
     )
 
-    background = get_background(args['input'])
-    background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
+    background = None
+    # background = get_background(args['input'])
+    # background = cv2.cvtColor(background, cv2.COLOR_BGR2GRAY)
 
     frame_count = 0
     consecutive_frame = args['consecutive_frames']
 
     while (cap.isOpened()):
         ret, frame = cap.read()
+        if background is None:
+            background = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            continue
         if ret:
             frame_count += 1
             orig_frame = frame.copy()
@@ -55,7 +60,9 @@ def detect(args):
             if frame_count % consecutive_frame == 0 or frame_count == 1:
                 frame_diff_list = []
             frame_diff = cv2.absdiff(gray, background)
-            ret, thres = cv2.threshold(frame_diff, 50, 255, cv2.THRESH_BINARY)
+            background = gray
+            blurred = cv2.GaussianBlur(frame_diff, (7, 7), 0)
+            ret, thres = cv2.threshold(blurred, 20, 255, cv2.THRESH_BINARY)
             dilate_frame = cv2.dilate(thres, None, iterations=2)
             frame_diff_list.append(dilate_frame)
             if len(frame_diff_list) == consecutive_frame:
@@ -78,7 +85,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', help='path to the input video',
                         required=True)
-    parser.add_argument('-c', '--consecutive-frames', default=4, type=int,
+    parser.add_argument('-c', '--consecutive-frames', default=1, type=int,
                         dest='consecutive_frames', help='continue frames')
     args = vars(parser.parse_args())
 
