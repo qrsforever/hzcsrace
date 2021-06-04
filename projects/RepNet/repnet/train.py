@@ -51,8 +51,8 @@ def getPeriodicity(periodLength):
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
     model.train()
     loss_list = []
-    for X, y1 in pbar:
-        X, y1, y2 = X.to(device), y1.to(device), getPeriodicity(y1).to(device).float() # y2.to(device)
+    for X, y1, y2, y3 in pbar:
+        X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
         y1_pred, y2_pred = model(X)
 
         loss1 = criterions[0](y1_pred, y1)
@@ -64,6 +64,13 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3_calc), (y3_calc + 1e-1)))
         # loss3 = criterions[0](y3_pred, y3_calc)
         # loss3 = torch.FloatTensor([0])
+
+        # if loss3.item() > 12:
+        #     print(y2.cpu().numpy())
+        #     print("#"*50)
+        #     print(y1.cpu().numpy())
+        #     print("#"*50)
+        #     print(y3_calc.cpu().numpy())
 
         loss = loss1 + 5 * loss2 + loss3
 
@@ -89,9 +96,8 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
     model.eval()
     loss_list = []
     with torch.no_grad():
-        for X, y1 in pbar:
-            # X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
-            X, y1, y2 = X.to(device), y1.to(device), getPeriodicity(y1).to(device).float()
+        for X, y1, y2, y3 in pbar:
+            X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
             y1_pred, y2_pred = model(X)
 
             loss1 = criterions[0](y1_pred, y1)
@@ -122,20 +128,18 @@ def inference(device, model, pbar, metrics_callback=None):
     # TODO only one test
     model.eval()
     with torch.no_grad():
-        for X, y1 in pbar:
-            # X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+        for X, y1, y2, y3_true in pbar:
             X, y1, y2 = X.to(device), y1.to(device), getPeriodicity(y1).to(device).float()
             y1_pred, y2_pred = model(X)
 
             y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
             y3_calc = torch.round(torch.sum((y2 > 0) / (y1 + 1e-1), 1))
-            y3_true = y3_calc
 
             if metrics_callback is not None:
                 metrics_callback(
                         y3_pred.cpu().numpy().flatten().astype(int).tolist()[:8],
                         y3_calc.cpu().numpy().flatten().astype(int).tolist()[:8],
-                        y3_true.cpu().numpy().flatten().astype(int).tolist()[:8])
+                        y3_true.numpy().flatten().astype(int).tolist()[:8])
 
             break
 
@@ -293,13 +297,13 @@ def run_train(opt):
 
     # hyper parameters
     params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = O.Adam(params, lr=0.00006)
+    optimizer = O.Adam(params, lr=0.001)
     # optimizer = O.SGD(params, lr=lr)
     # scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
-    scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=100, gamma=0.6)
+    # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=100, gamma=0.6)
     # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
     #     3, 10, 15, 25, 50, 100, 200, 300], gamma=0.7)
-    # scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-6)
+    scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=6e-5)
     criterions = [nn.SmoothL1Loss(), nn.BCEWithLogitsLoss()]
 
     train_loop(opt, model,

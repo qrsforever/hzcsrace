@@ -16,8 +16,8 @@ then
 fi
 
 data_root=/data/datasets/cv/countix
-from_path=$data_root/last4.pt
-save_path=$data_root/last4.pt
+from_path=$data_root/last5.pt
+save_path=$data_root/last5.pt
 
 # debug
 sudo /bin/rm -rf /data/RepNet

@@ -229,6 +229,8 @@ def inference(pose_model, det_model, opt):
     if args.flip:
         batchSize = int(batchSize / 2)
     try:
+        writer.resdata['progress'] = 0
+        _report_result(msgkey, resdata)
         for i in im_names_desc:
             # heart beating
             with torch.no_grad():

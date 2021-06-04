@@ -72,9 +72,7 @@ class SyntheticDataset(Dataset):
 
     def __getitem__(self, index):
 
-        X, periodLength, period = self.generateRepVid()
-        
-        return X, periodLength
+       return self.generateRepVid()
     
     def getPeriodDist(self, samples):
         arr = np.zeros(32,)
@@ -138,6 +136,7 @@ class SyntheticDataset(Dataset):
         
         numBegNoRepFrames = begNoRepDur*64//totalDur
         periodLength = np.zeros((64, 1))
+        periodicity = np.zeros((64, 1))
         begNoRepFrames = self.getNFrames(frames[:begNoRepDur], numBegNoRepFrames)
         finalFrames = begNoRepFrames
         
@@ -159,6 +158,7 @@ class SyntheticDataset(Dataset):
                     
                     try:
                         periodLength[curf] = noisyPeriod
+                        periodicity[curf] = 1
                     except: 
                         print(curf, numBegNoRepFrames, totalDur, begNoRepDur)
                     assert(noisyPeriod < 32)
@@ -173,17 +173,23 @@ class SyntheticDataset(Dataset):
         
         frames = randomTransform(finalFrames)
         
-        numBegNoRepFrames = begNoRepDur*64//totalDur
+        # numBegNoRepFrames = begNoRepDur*64//totalDur
+        assert count > 1, "count = %d" % count
         if count == 1:
             numEndNoRepFrames = 64 - numBegNoRepFrames
             period = 0
+
+        assert 2 <= count <= 32, "count: %d" % count
             
-        #assert(len(frames) == 64)
+        assert len(frames) == 64, 'len(frames) = %d' % len(frames)
         
         #frames = F.dropout(frames, p = 0.1)
         periodLength = torch.FloatTensor(periodLength)
+        periodicity = torch.FloatTensor(periodicity)
+ 
+        # assert 2 <= period <= 32, "period: %d, %d" % (period, len(repFrames))
         
-        return frames, periodLength, period
+        return frames, periodLength, periodicity, torch.FloatTensor([count])
 
     def __len__(self):
         return self.length

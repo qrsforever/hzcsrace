@@ -130,7 +130,8 @@ class CountixSynthDataset(Dataset):
         cframes = self._get_frames(cvid_path)
         sframes = self._get_frames(svid_path)
 
-        cvid_len = min(len(cframes), randint(int(0.7 * self.num_frames), self.num_frames))
+        cvid_len = min(len(cframes), randint(
+            max(2 * cvid_count, int(0.7 * self.num_frames)), self.num_frames))
         head_len = randint(0, self.num_frames - cvid_len)
         tail_len = self.num_frames - cvid_len - head_len
 
@@ -157,21 +158,23 @@ class CountixSynthDataset(Dataset):
 
         p_len = cvid_len / cvid_count
 
+        assert 2 <= p_len <= 32, "cvid_len: %d, cvid_count: %d" % (cvid_len, cvid_count)
+
         y1 = np.full((self.num_frames, 1), fill_value=p_len)
-        # y2 = np.ones((self.num_frames, 1))
+        y2 = np.ones((self.num_frames, 1))
 
         for i in range(self.num_frames):
             if i < head_len or i > (self.num_frames - tail_len):
                 y1[i] = 0
-                # y2[i] = 0
+                y2[i] = 0
                 Xlist[i] = F.dropout(Xlist[i], 0.2)
 
         X = torch.cat(Xlist)
         y1 = torch.FloatTensor(y1)
-        # y2 = torch.FloatTensor(y2)
-        # y3 = torch.FloatTensor([cvid_count])
+        y2 = torch.FloatTensor(y2)
+        y3 = torch.FloatTensor([cvid_count])
 
-        return X, y1 # , y2, y3
+        return X, y1, y2, y3
 
     def __len__(self):
         return len(self.data)
