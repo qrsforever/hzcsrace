@@ -60,7 +60,7 @@ parser.add_argument('--list', dest='inputlist',
 parser.add_argument('--image', dest='inputimg',
                     help='image-name', default="")
 parser.add_argument('--outdir', dest='outputpath',
-                    help='output-directory', default="/raceai/data/tmp/alphapose/output/halpe26")
+                    help='output-directory', default="/outputs")
 parser.add_argument('--save_img', default=False, action='store_true',
                     help='save result as image')
 parser.add_argument('--vis', default=False, action='store_true',
@@ -175,9 +175,10 @@ def inference(pose_model, det_model, opt):
     if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
 
-    outputpath = os.path.join(args.outputpath, user_code)
+    outputpath = os.path.join('/outputs', user_code)
     shutil.rmtree(outputpath, ignore_errors=True)
     os.makedirs(outputpath, exist_ok=True)
+    args.outputpath = outputpath
 
     if 'qsize' in opt:
         args.qsize = opt.qsize

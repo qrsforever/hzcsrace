@@ -18,8 +18,10 @@ import torch.optim as O  # noqa
 import shutil
 
 from repnet.data.countix.dataset import CountixDataset, CountixSynthDataset
+from repnet.data.SyntheticDataset import SyntheticDataset
 # from repnet.models.repnet import RepNet
 from repnet.models.repnet2 import RepNet
+from torch.utils.data import ConcatDataset
 
 from tqdm import tqdm
 
@@ -40,11 +42,17 @@ TENSORBOARD = False
 USE_SYNTHDATA = True
 
 
+def getPeriodicity(periodLength):
+    periodicity = torch.nn.functional.threshold(periodLength, 2, 0)
+    periodicity = -torch.nn.functional.threshold(-periodicity, -1, -1)
+    return periodicity
+
+
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
     model.train()
     loss_list = []
-    for X, y1, y2, _ in pbar:
-        X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+    for X, y1 in pbar:
+        X, y1, y2 = X.to(device), y1.to(device), getPeriodicity(y1).to(device).float() # y2.to(device)
         y1_pred, y2_pred = model(X)
 
         loss1 = criterions[0](y1_pred, y1)
@@ -81,8 +89,9 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
     model.eval()
     loss_list = []
     with torch.no_grad():
-        for X, y1, y2, _ in pbar:
-            X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+        for X, y1 in pbar:
+            # X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+            X, y1, y2 = X.to(device), y1.to(device), getPeriodicity(y1).to(device).float()
             y1_pred, y2_pred = model(X)
 
             loss1 = criterions[0](y1_pred, y1)
@@ -113,18 +122,20 @@ def inference(device, model, pbar, metrics_callback=None):
     # TODO only one test
     model.eval()
     with torch.no_grad():
-        for X, y1, y2, y3_true in pbar:
-            X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+        for X, y1 in pbar:
+            # X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+            X, y1, y2 = X.to(device), y1.to(device), getPeriodicity(y1).to(device).float()
             y1_pred, y2_pred = model(X)
 
             y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
             y3_calc = torch.round(torch.sum((y2 > 0) / (y1 + 1e-1), 1))
+            y3_true = y3_calc
 
             if metrics_callback is not None:
                 metrics_callback(
                         y3_pred.cpu().numpy().flatten().astype(int).tolist()[:8],
                         y3_calc.cpu().numpy().flatten().astype(int).tolist()[:8],
-                        y3_true.numpy().flatten().astype(int).tolist()[:8])
+                        y3_true.cpu().numpy().flatten().astype(int).tolist()[:8])
 
             break
 
@@ -249,8 +260,12 @@ def run_train(opt):
 
     # data loader
     if USE_SYNTHDATA:
-        train_dataset = CountixSynthDataset(DATASET_PREFIX, 'train')
-        valid_dataset = CountixSynthDataset(DATASET_PREFIX, 'val')
+        train_dataset = ConcatDataset([
+            CountixSynthDataset(DATASET_PREFIX, 'train'),
+            SyntheticDataset(DATASET_PREFIX, 3000)])
+        valid_dataset = ConcatDataset([
+            CountixSynthDataset(DATASET_PREFIX, 'val'),
+            SyntheticDataset(DATASET_PREFIX, 1500)])
         test_dataset = CountixSynthDataset(DATASET_PREFIX, 'test')
     else:
         train_dataset = CountixDataset(DATASET_PREFIX, 'train')
@@ -281,7 +296,7 @@ def run_train(opt):
     optimizer = O.Adam(params, lr=0.00006)
     # optimizer = O.SGD(params, lr=lr)
     # scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
-    scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=50, gamma=0.9)
+    scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=100, gamma=0.6)
     # scheduler = O.lr_scheduler.MultiStepLR(optimizer, milestones=[
     #     3, 10, 15, 25, 50, 100, 200, 300], gamma=0.7)
     # scheduler = O.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, min_lr=1e-6)

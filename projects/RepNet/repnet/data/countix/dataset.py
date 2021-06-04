@@ -106,9 +106,6 @@ class CountixSynthDataset(Dataset):
 
     def _get_frames(self, path):
         frames = []
-        if path is None:
-            path = self.path
-
         cap = cv2.VideoCapture(path)
         while cap.isOpened():
             ret, frame = cap.read()
@@ -161,20 +158,20 @@ class CountixSynthDataset(Dataset):
         p_len = cvid_len / cvid_count
 
         y1 = np.full((self.num_frames, 1), fill_value=p_len)
-        y2 = np.ones((self.num_frames, 1))
+        # y2 = np.ones((self.num_frames, 1))
 
         for i in range(self.num_frames):
             if i < head_len or i > (self.num_frames - tail_len):
                 y1[i] = 0
-                y2[i] = 0
+                # y2[i] = 0
                 Xlist[i] = F.dropout(Xlist[i], 0.2)
 
         X = torch.cat(Xlist)
         y1 = torch.FloatTensor(y1)
-        y2 = torch.FloatTensor(y2)
-        y3 = torch.FloatTensor([cvid_count])
+        # y2 = torch.FloatTensor(y2)
+        # y3 = torch.FloatTensor([cvid_count])
 
-        return X, y1, y2, y3
+        return X, y1 # , y2, y3
 
     def __len__(self):
         return len(self.data)

@@ -144,3 +144,5 @@ then
 else
 	python3 $top_dir/repnet/train.py
 fi
+
+# python3 predict.py --video_path /data/datasets/cv/repnet_datasets/testvids/test1701.mp4 --ckpt_from_path /data/datasets/cv/countix/last2.pt
