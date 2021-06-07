@@ -85,6 +85,12 @@ def inference(model, opt):
     # viz_reps = True
     # if 'viz_reps' in opt:
     #     viz_reps = opt.viz_reps
+    rm_still = False
+    if 'rm_still' in opt:
+        rm_still = opt.rm_still
+    area_rate_thres = 0.0625
+    if 'area_rate_thres' in opt:
+        area_rate_thres = opt.area_rate_thres
 
     if save_video:
         progress_strides_weight = 0.25
@@ -99,7 +105,9 @@ def inference(model, opt):
 
     resdata['progress'] = 1.0
     _report_result(msgkey, resdata)
-    frames, vid_fps = read_video(race_data(opt.video), rot=None)
+    frames, vid_fps = read_video(
+            race_data(opt.video), rot=None,
+            rm_still=rm_still, area_rate_thres=area_rate_thres)
     resdata['progress'] += 3.0
     _report_result(msgkey, resdata)
 

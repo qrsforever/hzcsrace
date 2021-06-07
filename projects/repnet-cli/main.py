@@ -22,7 +22,7 @@ def inference(model, args, imgs):
         constant_speed=args.constant_speed,
         median_filter=args.median_filter,
         fully_periodic=args.fully_periodic)
-    infer_time = time.time()-s_time
+    infer_time = time.time() - s_time
 
     return pred_period, pred_score, within_period, per_frame_counts, chosen_stride, infer_time
 
@@ -43,13 +43,19 @@ def process_video_file(model, args):
         outs = [args.out]
 
     for path, out in tqdm(zip(paths, outs), desc="Processing ..."):
-        imgs, vid_fps = read_video(path, rot=rot_dicts[args.rot])
+        imgs, vid_fps = read_video(
+                path,
+                rot=rot_dicts[args.rot],
+                rm_still=False)
 
         (pred_period, pred_score, within_period,
          per_frame_counts, chosen_stride, infer_time) = inference(model, args, imgs)
         print(f"Inference time: {infer_time:.02f}s. Visualizing ...")
-        create_count_video(imgs, per_frame_counts, within_period, score=pred_score, fps=vid_fps, output_file=out,
-                           delay=1000/vid_fps, plot_count=True, plot_within_period=True, plot_score=True, vizualize_reps=args.viz_reps)
+        create_count_video(imgs,
+                per_frame_counts, within_period, score=pred_score,
+                fps=vid_fps, output_file=out,
+                delay=1000 / vid_fps, plot_count=True,
+                plot_within_period=True, plot_score=True, vizualize_reps=args.viz_reps)
 
 
 def process_webcam(model, args, width=224, height=224):
@@ -77,7 +83,7 @@ def process_webcam(model, args, width=224, height=224):
                 plt.plot(np.cumsum(per_frame_counts))
                 plt.show()
 
-                while len(frames) > (win_size-strides):
+                while len(frames) > (win_size - strides):
                     frames.pop(0)
 
             frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)

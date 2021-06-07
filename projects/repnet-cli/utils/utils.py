@@ -6,7 +6,7 @@ import requests
 import os
 
 
-def read_video(video_filename, width=224, height=224, rot=None):
+def read_video(video_filename, width=224, height=224, rot=None, rm_still=False, area_rate_thres=0.0625):
     """Read video from file."""
     cap = cv2.VideoCapture(video_filename)
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -14,12 +14,33 @@ def read_video(video_filename, width=224, height=224, rot=None):
     n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     pbar = tqdm(total=n_frames, desc=f"Getting frames from {video_filename} ...")
 
+    if rm_still: # remove still frames
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        pre_frame = None
+        area_thres = area_rate_thres * width * height
     frames = []
     if cap.isOpened():
         while True:
             success, frame_bgr = cap.read()
             if not success:
                 break
+            if rm_still:
+                keep_flag = False
+                frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
+                if pre_frame is not None:
+                    frame_tmp = cv2.absdiff(frame_gray, pre_frame)
+                    frame_tmp = cv2.threshold(frame_tmp, 20, 255, cv2.THRESH_BINARY)[1]
+                    frame_tmp = cv2.dilate(frame_tmp, None, iterations=2)
+                    contours, _ = cv2.findContours(frame_tmp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                    for contour in contours:
+                        if cv2.contourArea(contour) > area_thres:
+                            keep_flag = True
+                            break
+                pre_frame = frame_gray
+                if not keep_flag:
+                    pbar.update()
+                    continue
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
             frame_rgb = cv2.resize(frame_rgb, (width, height))
             if rot:
@@ -28,6 +49,9 @@ def read_video(video_filename, width=224, height=224, rot=None):
 
             pbar.update()
     pbar.close()
+    print(n_frames, 'vs', len(frames))
+    if rm_still:
+        fps = len(frames) * fps / n_frames
     frames = np.asarray(frames)
     return frames, fps
 
