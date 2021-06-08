@@ -174,7 +174,7 @@ class CountixSynthDataset(Dataset):
         y2 = torch.FloatTensor(y2)
         y3 = torch.FloatTensor([cvid_count])
 
-        return X, y1, y2, y3
+        return X, y1, y2, y3, cvid_path
 
     def __len__(self):
         return len(self.data)
