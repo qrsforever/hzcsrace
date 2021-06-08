@@ -51,22 +51,23 @@ class YOLODetector(BaseDetector):
         self.model = None
 
     def load_model(self):
-        args = self.detector_opt
+        if self.model is None:
+            args = self.detector_opt
 
-        print('Loading YOLO model..')
-        self.model = Darknet(self.model_cfg)
-        self.model.load_weights(self.model_weights)
-        self.model.net_info['height'] = self.inp_dim
-        
+            print('Loading YOLO model..')
+            self.model = Darknet(self.model_cfg)
+            self.model.load_weights(self.model_weights)
+            self.model.net_info['height'] = self.inp_dim
+            
 
-        if args:
-            if len(args.gpus) > 1:
-                self.model = torch.nn.DataParallel(self.model, device_ids=args.gpus).to(args.device)
+            if args:
+                if len(args.gpus) > 1:
+                    self.model = torch.nn.DataParallel(self.model, device_ids=args.gpus).to(args.device)
+                else:
+                    self.model.to(args.device)
             else:
-                self.model.to(args.device)
-        else:
-            self.model.cuda()
-        self.model.eval()
+                self.model.cuda()
+            self.model.eval()
 
     def image_preprocess(self, img_source):
         """

@@ -236,6 +236,10 @@ def inference(pose_model, det_model, opt):
             with torch.no_grad():
                 (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
                 if orig_img is None:
+                    # QRS use it pass error info
+                    if im_name is not None:
+                        resdata['errno'] = -1
+                        resdata['errtext'] = im_name
                     break
                 if boxes is None or boxes.nelement() == 0:
                     writer.save(None, None, None, None, None, orig_img, im_name)
@@ -281,6 +285,7 @@ def inference(pose_model, det_model, opt):
             if args.save_video:
                 resdata['target_mp4'] = prefix + os.path.join(outputpath, 'alphapose-target.mp4')
             race_object_put(osscli, outputpath, bucket_name='raceai')
+            Logger.info(resdata)
             _report_result(msgkey, resdata)
 
     except Exception as e:

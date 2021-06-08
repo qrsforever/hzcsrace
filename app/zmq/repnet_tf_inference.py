@@ -105,7 +105,7 @@ def inference(model, opt):
 
     resdata['progress'] = 1.0
     _report_result(msgkey, resdata)
-    frames, vid_fps = read_video(
+    frames, vid_fps, still_frames = read_video(
             race_data(opt.video), rot=None,
             rm_still=rm_still, area_rate_thres=area_rate_thres)
     resdata['progress'] += 3.0
@@ -137,6 +137,28 @@ def inference(model, opt):
     infer_time = time.time() - s_time
     Logger.info('model inference using time: %d' % infer_time)
 
+    if rm_still and len(still_frames) > 0:
+        all_frames_count = len(frames) + len(still_frames)
+        final_frames = [None] * all_frames_count
+        final_within_period = [.0] * all_frames_count
+        final_per_frame_counts = [.0] * all_frames_count
+        i, j = 0, 0
+        for k in range(all_frames_count):
+            if j < len(still_frames) and k == still_frames[j][0]:
+                final_frames[k] = still_frames[j][1]
+                j += 1
+            elif i < len(frames):
+                final_frames[k] = frames[i]
+                final_within_period[k] = within_period[i]
+                final_per_frame_counts[k] = per_frame_counts[i]
+                i += 1
+            else:
+                raise '%d vs %d vs %d' % (i, j, k)
+        frames = final_frames
+        within_period = final_within_period
+        per_frame_counts = np.asarray(final_per_frame_counts)
+    sum_counts = np.cumsum(per_frame_counts)
+
     json_result = {}
     json_result['period'] = pred_period
     json_result['score'] = np.float(pred_score.numpy())
@@ -146,7 +168,6 @@ def inference(model, opt):
     json_result['infer_time'] = infer_time
     frames_info = []
     spf = 1 / vid_fps # time second for per frame
-    sum_counts = np.cumsum(per_frame_counts)
     for i, (in_period, p_count) in enumerate(zip(within_period, per_frame_counts)):
         frames_info.append({
             'image_id': '%d.jpg' % i,
@@ -164,7 +185,7 @@ def inference(model, opt):
                 fps=vid_fps, output_file=outfile, delay=1000 / vid_fps,
                 vizualize_reps=True, progress_cb=_video_save_progress)
         mkvid_time = time.time() - s_time - infer_time
-        json_result['mkvideo_time'] = mkvid_time 
+        json_result['mkvideo_time'] = mkvid_time
         json_result['target_mp4'] = prefix + outfile
         resdata['target_mp4'] = prefix + outfile
 

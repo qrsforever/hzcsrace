@@ -220,7 +220,12 @@ class DetectionLoader():
                     imgs = torch.cat((imgs, torch.unsqueeze(imgs[0], dim=0)), 0)
                     im_dim_list = torch.cat((im_dim_list, torch.unsqueeze(im_dim_list[0], dim=0)), 0)
 
-                dets = self.detector.images_detection(imgs, im_dim_list)
+                # QRS
+                try:
+                    dets = self.detector.images_detection(imgs, im_dim_list)
+                except Exception as err:
+                    self.wait_and_put(self.det_queue, (None, '%s' % err, None, None, None, None, None))
+                    return
                 if isinstance(dets, int) or dets.shape[0] == 0:
                     for k in range(len(orig_imgs)):
                         self.wait_and_put(self.det_queue, (orig_imgs[k], im_names[k], None, None, None, None, None))
@@ -250,7 +255,7 @@ class DetectionLoader():
             with torch.no_grad():
                 (orig_img, im_name, boxes, scores, ids, inps, cropped_boxes) = self.wait_and_get(self.det_queue)
                 if orig_img is None or self.stopped:
-                    self.wait_and_put(self.pose_queue, (None, None, None, None, None, None, None))
+                    self.wait_and_put(self.pose_queue, (None, None, im_name, None, None, None, None))
                     return
                 if boxes is None or boxes.nelement() == 0:
                     self.wait_and_put(self.pose_queue, (None, orig_img, im_name, boxes, scores, ids, None))

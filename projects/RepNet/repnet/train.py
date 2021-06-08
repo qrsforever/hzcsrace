@@ -52,25 +52,17 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
     model.train()
     loss_list = []
     for X, y1, y2, y3, paths in pbar:
-        X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+        X, y1, y2, y3 = X.to(device), y1.to(device), y2.to(device), y3.to(device)
         y1_pred, y2_pred = model(X)
 
         loss1 = criterions[0](y1_pred, y1)
         loss2 = criterions[1](y2_pred, y2)
 
         # count error
-        y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
-        y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
-        loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3_calc), (y3_calc + 1e-1)))
-        if loss3.item() > 40:
-            print('y3_pred:', ', '.join(list(map(str, y3_pred.detach().cpu().numpy()))))
-            print('y3_calc:', ', '.join(list(map(str, y3_calc.detach().cpu().numpy()))))
-            print('y3_true:', ', '.join(list(map(str, y3.detach().cpu().numpy()))))
-        #     print('y1:', ', '.join(list(map(str, y1.detach().cpu().numpy()))))
-        #     print('y2:', ', '.join(list(map(str, y2.detach().cpu().numpy()))))
-        #     print('y1_pred:', ', '.join(list(map(str, y1_pred.detach().cpu().numpy()))))
-        #     print('y2_pred:', ', '.join(list(map(str, y2_pred.detach().cpu().numpy()))))
-            print(paths)
+        y3_pred = torch.sum((y2_pred > 0) / torch.nn.functional.threshold(y1_pred, 1e-1, 1e-1), 1)
+        # y3_calc = torch.sum((y2 > 0) / torch.nn.functional.threshold(y1, 1e-1, 1e-1), 1)
+        # loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3_calc), (y3_calc + 1e-1)))
+        loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3), y3))
 
         loss = loss1 + 5 * loss2 + loss3
 
@@ -97,27 +89,14 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
     loss_list = []
     with torch.no_grad():
         for X, y1, y2, y3, paths in pbar:
-            X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
+            X, y1, y2, y3 = X.to(device), y1.to(device), y2.to(device), y3.to(device)
             y1_pred, y2_pred = model(X)
 
             loss1 = criterions[0](y1_pred, y1)
             loss2 = criterions[1](y2_pred, y2)
 
-            y3_pred = torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1)
-            y3_calc = torch.sum((y2 > 0) / (y1 + 1e-1), 1)
-            loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3_calc), (y3_calc + 1e-1)))
-            # loss3 = criterions[0](y3_pred, y3_calc)
-            # loss3 = torch.FloatTensor([0])
-
-            if loss3.item() > 30:
-                print('y3_pred:', ', '.join(list(map(str, y3_pred.detach().cpu().numpy()))))
-                print('y3_calc:', ', '.join(list(map(str, y3_calc.detach().cpu().numpy()))))
-                print('y3_true:', ', '.join(list(map(str, y3.detach().cpu().numpy()))))
-                # print('y1:', ', '.join(list(map(str, y1.detach().cpu().numpy()))))
-                # print('y2:', ', '.join(list(map(str, y2.detach().cpu().numpy()))))
-                # print('y1_pred:', ', '.join(list(map(str, y1_pred.detach().cpu().numpy()))))
-                # print('y2_pred:', ', '.join(list(map(str, y2_pred.detach().cpu().numpy()))))
-                print(paths)
+            y3_pred = torch.sum((y2_pred > 0) / torch.nn.functional.threshold(y1_pred, 1e-1, 1e-1), 1)
+            loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3), y3))
 
             loss = loss1 + 5 * loss2 + loss3
 
@@ -307,7 +286,7 @@ def run_train(opt):
 
     # hyper parameters
     params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = O.Adam(params, lr=0.0001)
+    optimizer = O.Adam(params, lr=0.0005)
     # optimizer = O.SGD(params, lr=lr)
     # scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
     # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=100, gamma=0.6)

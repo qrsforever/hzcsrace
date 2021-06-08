@@ -20,13 +20,15 @@ def read_video(video_filename, width=224, height=224, rot=None, rm_still=False, 
         pre_frame = None
         area_thres = area_rate_thres * width * height
     frames = []
+    still_frames = []
     if cap.isOpened():
+        frame_idx = 0
         while True:
             success, frame_bgr = cap.read()
             if not success:
                 break
+            keep_flag = False
             if rm_still:
-                keep_flag = False
                 frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
                 if pre_frame is not None:
                     frame_tmp = cv2.absdiff(frame_gray, pre_frame)
@@ -38,22 +40,24 @@ def read_video(video_filename, width=224, height=224, rot=None, rm_still=False, 
                             keep_flag = True
                             break
                 pre_frame = frame_gray
-                if not keep_flag:
-                    pbar.update()
-                    continue
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
             frame_rgb = cv2.resize(frame_rgb, (width, height))
             if rot:
                 frame_rgb = cv2.rotate(frame_rgb, rot)
-            frames.append(frame_rgb)
+            if rm_still and not keep_flag:
+                still_frames.append((frame_idx, frame_rgb))
+            else:
+                frames.append(frame_rgb)
+            frame_idx += 1
 
             pbar.update()
     pbar.close()
     print(n_frames, 'vs', len(frames))
-    if rm_still:
-        fps = len(frames) * fps / n_frames
+    # if rm_still:
+    #     fps = len(frames) * fps / n_frames
     frames = np.asarray(frames)
-    return frames, fps
+    still_frames = np.asarray(still_frames)
+    return frames, fps, still_frames
 
 
 def wget(url, path):
