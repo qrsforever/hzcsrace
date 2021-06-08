@@ -25,6 +25,7 @@ def getRandomTransformParameter(high, mid, low, length=64):
     retarr = retarr[::random.choice([-1, 1])]
     return retarr
 
+
 def randomTransform(frames):
     scaleParams = getRandomTransformParameter(0.9, 0.75, 0.5)
     zRotateParams = getRandomTransformParameter(45, 0, -45)
@@ -140,7 +141,7 @@ class SyntheticDataset(Dataset):
         begNoRepFrames = self.getNFrames(frames[:begNoRepDur], numBegNoRepFrames)
         finalFrames = begNoRepFrames
         
-        repFrames = frames[begNoRepDur : -endNoRepDur]
+        repFrames = frames[begNoRepDur : begNoRepDur + clipDur]
         repFrames.extend(repFrames[::-1])
 
         if len(repFrames) >= period:
@@ -189,7 +190,7 @@ class SyntheticDataset(Dataset):
  
         # assert 2 <= period <= 32, "period: %d, %d" % (period, len(repFrames))
         
-        return frames, periodLength, periodicity, torch.FloatTensor([count])
+        return frames, periodLength, periodicity, torch.FloatTensor([count]), path
 
     def __len__(self):
         return self.length
