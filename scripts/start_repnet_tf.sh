@@ -25,6 +25,7 @@ __start_raceai()
         --network host \
         --env TOPIC=zmq.repnet_tf.inference \
         --env PYTHONPATH=/raceai/codes/app:/raceai/codes/projects/repnet-cli \
+        --env TF_CPP_MIN_LOG_LEVEL=3 \
         --env MINIO_SERVER_URL=$minio_server_url \
         --env MINIO_ACCESS_KEY=$minio_access_key \
         --env MINIO_SECRET_KEY=$minio_secret_key \

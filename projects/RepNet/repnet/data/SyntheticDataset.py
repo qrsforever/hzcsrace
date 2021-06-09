@@ -16,11 +16,11 @@ def getRandomTransformParameter(high, mid, low, length=64):
     retarr = []
     midpos = randint(length//4, length//2)
     highpos = randint(length//2, 3*length//4)
-    
+
     retarr = list(np.linspace(start=low, stop=mid, num=midpos))
     retarr.extend(list(np.linspace(start=mid, stop=high, num=highpos-midpos)))
     retarr.extend(list(np.linspace(start=high, stop=mid, num=length - highpos)))
-    
+
     retarr = np.array(retarr)
     retarr = retarr[::random.choice([-1, 1])]
     return retarr
@@ -31,17 +31,17 @@ def randomTransform(frames):
     zRotateParams = getRandomTransformParameter(45, 0, -45)
     xRotateParams = getRandomTransformParameter(0.2, 0.0, -0.2, 32)
     yRotateParams = getRandomTransformParameter(0.2, 0.0, -0.2, 32)
-    
+
     h, w, c = frames[0].shape
     erParams = [randint(0,h-h/2), randint(0,w-w/2), h//2, w//2]
     erVal = getRandomTransformParameter(1.0, 0.5, 0.0)
     horizTransParam = (h/4)*getRandomTransformParameter(0.4, 0.0, -0.4)
     verticalTransParam = (w/4)*getRandomTransformParameter(0.4, 0.0, -0.4)
-    
+
     newFrames = []
 
     for i, frame in enumerate(frames):
-        
+
 
         img = Image.fromarray(frame)
         preprocess = transforms.Compose([
@@ -59,14 +59,14 @@ def randomTransform(frames):
                                              [0.0, 0.0],
                                              0)
         newFrames.append(frame)
-    
+
     frames = torch.cat(newFrames)
-        
+
     return frames
 
 
 class SyntheticDataset(Dataset):
-    
+
     def __init__(self, videoPath, length):
         self.synthvids = glob.glob(videoPath + '/synthvids/train*.mp4')
         self.length = length
@@ -74,26 +74,26 @@ class SyntheticDataset(Dataset):
     def __getitem__(self, index):
 
        return self.generateRepVid()
-    
+
     def getPeriodDist(self, samples):
         arr = np.zeros(32,)
-        
+
         for i in tqdm(range(samples)):
             _, _, p = self.generateRepVid()
             arr[p] += 1
         return arr
-    
+
     def getNFrames(self, frames, n):
-        
+
         newFrames = []
         for i in range(1, n + 1):
             newFrames.append(frames[i * len(frames)//n  - 1])
-            
+
         assert(len(newFrames) == n)
         return newFrames
-        
+
     def generateRepVid(self):
-        
+
         while True:
             path = random.choice(self.synthvids)
             assert os.path.exists(path), "No file with this pattern exist" + path
@@ -104,26 +104,26 @@ class SyntheticDataset(Dataset):
                 break
             else:
                 os.remove(path)
-        
+
         mirror = np.random.choice([0, 1], p = [0.8, 0.2])
         halfperiod = randint(2 , 31) // (mirror + 1)
         period = (mirror + 1) * halfperiod
         count = randint(max(2, 16//period), 64//(period))
-        
-        clipDur = randint(min(total//(64/period - count + 1), max(period, 30)), 
+
+        clipDur = randint(min(total//(64/period - count + 1), max(period, 30)),
                           min(total//(64/period - count + 1), 60))
 
         repDur = count * clipDur
         noRepDur =  int((64 / (period*count) - 1) * repDur)
-         
+
         assert(noRepDur >= 0)
         begNoRepDur = randint(0,  noRepDur)
         endNoRepDur = noRepDur - begNoRepDur
         totalDur = noRepDur + repDur
-            
+
         startFrame = randint(0, total - (clipDur + noRepDur))
         cap.set(cv2.CAP_PROP_POS_FRAMES, startFrame)
-        
+
         frames = []
         while cap.isOpened():
             ret, frame = cap.read()
@@ -131,16 +131,16 @@ class SyntheticDataset(Dataset):
                 break
             frame = cv2.resize(frame , (112, 112), interpolation = cv2.INTER_AREA)
             frames.append(frame)
-        
+
         cap.release()
-        
-        
+
+
         numBegNoRepFrames = begNoRepDur*64//totalDur
         periodLength = np.zeros((64, 1))
         periodicity = np.zeros((64, 1))
         begNoRepFrames = self.getNFrames(frames[:begNoRepDur], numBegNoRepFrames)
         finalFrames = begNoRepFrames
-        
+
         repFrames = frames[begNoRepDur : begNoRepDur + clipDur]
         repFrames.extend(repFrames[::-1])
 
@@ -156,24 +156,24 @@ class SyntheticDataset(Dataset):
                 finalFrames.extend(noisyFrames)
 
                 for p in range(noisyPeriod):
-                    
+
                     try:
                         periodLength[curf] = noisyPeriod
                         periodicity[curf] = 1
-                    except: 
+                    except:
                         print(curf, numBegNoRepFrames, totalDur, begNoRepDur)
                     assert(noisyPeriod < 32)
                     curf+=1
-                                                
+
         else:
             period = 0
-            
-        numEndNoRepFrames = 64 - len(finalFrames) 
+
+        numEndNoRepFrames = 64 - len(finalFrames)
         endNoRepFrames = self.getNFrames(frames[-endNoRepDur:], numEndNoRepFrames)
         finalFrames.extend(endNoRepFrames)
-        
+
         frames = randomTransform(finalFrames)
-        
+
         # numBegNoRepFrames = begNoRepDur*64//totalDur
         assert count > 1, "count = %d" % count
         if count == 1:
@@ -181,15 +181,15 @@ class SyntheticDataset(Dataset):
             period = 0
 
         assert 2 <= count <= 32, "count: %d" % count
-            
+
         assert len(frames) == 64, 'len(frames) = %d' % len(frames)
-        
-        #frames = F.dropout(frames, p = 0.1)
+
+        # frames = F.dropout(frames, p = 0.1)
         periodLength = torch.FloatTensor(periodLength)
         periodicity = torch.FloatTensor(periodicity)
- 
+
         # assert 2 <= period <= 32, "period: %d, %d" % (period, len(repFrames))
-        
+
         return frames, periodLength, periodicity, torch.FloatTensor([count]), path
 
     def __len__(self):

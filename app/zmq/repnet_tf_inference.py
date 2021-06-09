@@ -13,9 +13,10 @@ import time, os, json
 import zmq
 import shutil
 import numpy as np
+import cv2
 
 from utils import get_model, read_video
-from repnet import get_counts, create_count_video
+from repnet import get_counts
 
 from omegaconf import OmegaConf
 from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)
@@ -82,20 +83,20 @@ def inference(model, opt):
     save_video = True
     if 'save_video' in opt:
         save_video = opt.save_video
-    # viz_reps = True
-    # if 'viz_reps' in opt:
-    #     viz_reps = opt.viz_reps
     rm_still = False
     if 'rm_still' in opt:
         rm_still = opt.rm_still
     area_rate_thres = 0.0625
-    if 'area_rate_thres' in opt:
-        area_rate_thres = opt.area_rate_thres
+    if 'area_rate_threshold' in opt:
+        area_rate_thres = opt.area_rate_threshold
+    best_stride_video = False
+    if 'best_stride_video' in opt:
+        best_stride_video = opt.best_stride_video
 
     if save_video:
-        progress_strides_weight = 0.25
+        model_progress_weight = 0.40
     else:
-        progress_strides_weight = 0.95
+        model_progress_weight = 0.78
 
     resdata = {'pigeon': dict(opt.pigeon), 'task': main_args.topic, 'errno': 0}
 
@@ -103,23 +104,28 @@ def inference(model, opt):
     shutil.rmtree(outdir, ignore_errors=True)
     os.makedirs(outdir, exist_ok=True)
 
-    resdata['progress'] = 1.0
-    _report_result(msgkey, resdata)
-    frames, vid_fps, still_frames = read_video(
-            race_data(opt.video), rot=None,
-            rm_still=rm_still, area_rate_thres=area_rate_thres)
-    resdata['progress'] += 3.0
-    _report_result(msgkey, resdata)
+    def _video_read_progress(x):
+        resdata['progress'] = x * 0.2
+        # Logger.info(resdata['progress'])
+        _report_result(msgkey, resdata)
 
     def _model_strides_progress(x):
-        resdata['progress'] = 4.0 + x * progress_strides_weight
+        resdata['progress'] = 20 + x * model_progress_weight
         Logger.info(resdata['progress'])
         _report_result(msgkey, resdata)
 
     def _video_save_progress(x):
-        resdata['progress'] = 29 + x * (0.95 - progress_strides_weight)
+        resdata['progress'] = 60 + x * 0.38
         Logger.info(resdata['progress'])
         _report_result(msgkey, resdata)
+
+    resdata['progress'] = 0.0
+    _report_result(msgkey, resdata)
+    frames, vid_fps, still_frames = read_video(
+            race_data(opt.video), width=112, height=112, rot=None,
+            progress_cb=_video_read_progress,
+            rm_still=rm_still, area_rate_thres=area_rate_thres)
+    _report_result(msgkey, resdata)
 
     s_time = time.time()
     (pred_period, pred_score,
@@ -137,24 +143,26 @@ def inference(model, opt):
     infer_time = time.time() - s_time
     Logger.info('model inference using time: %d' % infer_time)
 
+    all_frames_count = len(frames) + len(still_frames)
+    is_still_frames = [False] * all_frames_count
     if rm_still and len(still_frames) > 0:
-        all_frames_count = len(frames) + len(still_frames)
-        final_frames = [None] * all_frames_count
+        # final_frames = [None] * all_frames_count
         final_within_period = [.0] * all_frames_count
         final_per_frame_counts = [.0] * all_frames_count
         i, j = 0, 0
         for k in range(all_frames_count):
             if j < len(still_frames) and k == still_frames[j][0]:
-                final_frames[k] = still_frames[j][1]
+                # final_frames[k] = still_frames[j][1]
+                is_still_frames[k] = True
                 j += 1
             elif i < len(frames):
-                final_frames[k] = frames[i]
+                # final_frames[k] = frames[i]
                 final_within_period[k] = within_period[i]
                 final_per_frame_counts[k] = per_frame_counts[i]
                 i += 1
             else:
                 raise '%d vs %d vs %d' % (i, j, k)
-        frames = final_frames
+        # frames = final_frames
         within_period = final_within_period
         per_frame_counts = np.asarray(final_per_frame_counts)
     sum_counts = np.cumsum(per_frame_counts)
@@ -164,14 +172,18 @@ def inference(model, opt):
     json_result['score'] = np.float(pred_score.numpy())
     json_result['stride'] = chosen_stride
     json_result['fps'] = vid_fps
-    json_result['num_frames'] = len(frames)
+    json_result['num_frames'] = all_frames_count
+    if rm_still:
+        json_result['num_still_frames'] = len(still_frames)
+        json_result['area_rate_threshold'] = area_rate_thres
     json_result['infer_time'] = infer_time
     frames_info = []
     spf = 1 / vid_fps # time second for per frame
-    for i, (in_period, p_count) in enumerate(zip(within_period, per_frame_counts)):
+    for i, (in_period, p_count, is_still) in enumerate(zip(within_period, per_frame_counts, is_still_frames)):
         frames_info.append({
             'image_id': '%d.jpg' % i,
             'at_time': round((i + 1) * spf, 3),
+            'is_still': is_still,
             'within_period': float(in_period),
             'pframe_counts': float(p_count),
             'cum_counts': sum_counts[i]
@@ -181,13 +193,41 @@ def inference(model, opt):
     prefix = 'https://raceai.s3.didiyunapi.com'
     if save_video:
         outfile = os.path.join(outdir, 'repnet_tf-target.mp4')
-        create_count_video(frames, per_frame_counts, within_period, score=pred_score,
-                fps=vid_fps, output_file=outfile, delay=1000 / vid_fps,
-                vizualize_reps=True, progress_cb=_video_save_progress)
+        cap = cv2.VideoCapture(opt.video)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        fcnts = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fmt = cv2.VideoWriter_fourcc(*'mp4v')
+        vid = cv2.VideoWriter(outfile, fmt, fps, (width, height))
+        if best_stride_video:
+            out = os.path.join(outdir, 'repnet_tf-target-stride.mp4')
+            stride_vid = cv2.VideoWriter(out, fmt, fps, (width, height))
+            resdata['stride_mp4'] = prefix + out
+            json_result['stride_mp4'] = prefix + out
+        resdata['target_mp4'] = prefix + outfile
+        json_result['target_mp4'] = prefix + outfile
+        if cap.isOpened():
+            idx = 0
+            while True:
+                success, frame_bgr = cap.read()
+                if not success:
+                    break
+                cv2.putText(frame_bgr,
+                        'count: %.3f' % sum_counts[idx], (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 0, 255), 2)
+                if idx % 100 == 0:
+                    _video_save_progress(round((100 * float(idx)) / fcnts, 2))
+                if best_stride_video and idx % chosen_stride == 0:
+                    stride_vid.write(frame_bgr)
+                vid.write(frame_bgr)
+                idx += 1
+        vid.release()
+        cap.release()
+        if best_stride_video:
+            stride_vid.release()
         mkvid_time = time.time() - s_time - infer_time
         json_result['mkvideo_time'] = mkvid_time
-        json_result['target_mp4'] = prefix + outfile
-        resdata['target_mp4'] = prefix + outfile
 
     json_result_file = os.path.join(outdir, 'repnet_tf-results.json')
     with open(json_result_file, 'w') as fw:

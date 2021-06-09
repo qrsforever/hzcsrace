@@ -17,10 +17,10 @@ import numpy as np
 import torch.optim as O  # noqa
 import shutil
 
-from repnet.data.countix.dataset import CountixDataset, CountixSynthDataset
+from repnet.data.countix.dataset import CountixDataset, CountixSynthDataset # noqa
 from repnet.data.SyntheticDataset import SyntheticDataset
-# from repnet.models.repnet import RepNet
-from repnet.models.repnet2 import RepNet
+from repnet.models.repnet import RepNet
+# from repnet.models.repnet2 import RepNet
 from torch.utils.data import ConcatDataset
 
 from tqdm import tqdm
@@ -42,12 +42,6 @@ TENSORBOARD = False
 USE_SYNTHDATA = True
 
 
-def getPeriodicity(periodLength):
-    periodicity = torch.nn.functional.threshold(periodLength, 2, 0)
-    periodicity = -torch.nn.functional.threshold(-periodicity, -1, -1)
-    return periodicity
-
-
 def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
     model.train()
     loss_list = []
@@ -59,12 +53,22 @@ def train(device, model, pbar, optimizer, criterions, metrics_callback=None):
         loss2 = criterions[1](y2_pred, y2)
 
         # count error
-        y3_pred = torch.sum((y2_pred > 0) / torch.nn.functional.threshold(y1_pred, 1e-1, 1e-1), 1)
-        # y3_calc = torch.sum((y2 > 0) / torch.nn.functional.threshold(y1, 1e-1, 1e-1), 1)
+        # y3_pred = torch.sum((y2_pred > 0) / torch.nn.functional.threshold(y1_pred, 1e-3, 1e-1), 1)
+        # y3_calc = torch.sum((y2 > 0) / torch.nn.functional.threshold(y1, 1e-3, 1e-1), 1)
+        # for i, (y3_calc_np, y3_true_np) in enumerate(
+        #         list(zip(y3_calc.detach().cpu().numpy().flatten().astype(int).tolist(),
+        #                 y3.cpu().numpy().flatten().astype(int).tolist()))):
+        #     if y3_calc_np <= 0 and y3_calc_np != y3_true_np:
+        #         print('y3_pred:', ', '.join(list(map(str, y3_pred.detach().cpu().numpy()[i]))))
+        #         print('y3_calc:', ', '.join(list(map(str, y3_calc.detach().cpu().numpy()[i]))))
+        #         print('y3_true:', ', '.join(list(map(str, y3.detach().cpu().numpy()[i]))))
+        #         print('y1:', ', '.join(list(map(str, y1.detach().cpu().numpy()[i]))))
+        #         print('y2:', ', '.join(list(map(str, y2.detach().cpu().numpy()[i]))))
         # loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3_calc), (y3_calc + 1e-1)))
-        loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3), y3))
+        # loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3), y3))
+        loss3 = torch.FloatTensor([1.0])
 
-        loss = loss1 + 5 * loss2 + loss3
+        loss = loss1 + 5 * loss2 # + loss3
 
         optimizer.zero_grad()
         loss.backward()
@@ -95,10 +99,11 @@ def valid(device, model, pbar, criterions, metrics_callback=None):
             loss1 = criterions[0](y1_pred, y1)
             loss2 = criterions[1](y2_pred, y2)
 
-            y3_pred = torch.sum((y2_pred > 0) / torch.nn.functional.threshold(y1_pred, 1e-1, 1e-1), 1)
-            loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3), y3))
+            # y3_pred = torch.sum((y2_pred > 0) / torch.nn.functional.threshold(y1_pred, 1e-3, 1e-1), 1)
+            # loss3 = torch.sum(torch.div(torch.abs(y3_pred - y3), y3))
+            loss3 = torch.FloatTensor([1.0])
 
-            loss = loss1 + 5 * loss2 + loss3
+            loss = loss1 + 5 * loss2 # + loss3
 
             loss_list.append(loss.item())
 
@@ -118,11 +123,20 @@ def inference(device, model, pbar, metrics_callback=None):
     model.eval()
     with torch.no_grad():
         for X, y1, y2, y3_true, paths in pbar:
-            X, y1, y2 = X.to(device), y1.to(device), getPeriodicity(y1).to(device).float()
+            X, y1, y2 = X.to(device), y1.to(device), y2.to(device)
             y1_pred, y2_pred = model(X)
 
-            y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
-            y3_calc = torch.round(torch.sum((y2 > 0) / (y1 + 1e-1), 1))
+            # y3_pred = torch.round(torch.sum((y2_pred > 0) / (y1_pred + 1e-1), 1))
+            y3_pred = torch.sum((y2_pred > 0) / torch.nn.functional.threshold(y1_pred, 1e-3, 1e-1), 1)
+            y3_calc = torch.sum((y2 > 0) / torch.nn.functional.threshold(y1, 1e-1, 1e-1), 1)
+
+            # debug
+            for i, (y3_calc_np, y3_true_np) in enumerate(
+                    list(zip(y3_calc.cpu().numpy().flatten().astype(int).tolist(),
+                            y3_true.cpu().numpy().flatten().astype(int).tolist()))):
+                if abs(y3_calc_np - y3_true_np) > 1:
+                    print('y1:', ', '.join(list(map(str, y1.cpu().numpy()[i]))))
+                    print('y2:', ', '.join(list(map(str, y2.cpu().numpy()[i]))))
 
             if metrics_callback is not None:
                 metrics_callback(
@@ -253,13 +267,14 @@ def run_train(opt):
 
     # data loader
     if USE_SYNTHDATA:
+        # CountixSynthDataset(DATASET_PREFIX, 'train'),
         train_dataset = ConcatDataset([
-            CountixSynthDataset(DATASET_PREFIX, 'train'),
-            SyntheticDataset(DATASET_PREFIX, 3000)])
+            SyntheticDataset(DATASET_PREFIX, 8000)])
+        # CountixSynthDataset(DATASET_PREFIX, 'val'),
         valid_dataset = ConcatDataset([
-            CountixSynthDataset(DATASET_PREFIX, 'val'),
-            SyntheticDataset(DATASET_PREFIX, 1500)])
-        test_dataset = CountixSynthDataset(DATASET_PREFIX, 'test')
+            SyntheticDataset(DATASET_PREFIX, 1000)])
+        test_dataset = SyntheticDataset(DATASET_PREFIX, 100)
+        # test_dataset = CountixSynthDataset(DATASET_PREFIX, 'test')
     else:
         train_dataset = CountixDataset(DATASET_PREFIX, 'train')
         valid_dataset = CountixDataset(DATASET_PREFIX, 'val')
@@ -286,7 +301,7 @@ def run_train(opt):
 
     # hyper parameters
     params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = O.Adam(params, lr=0.0005)
+    optimizer = O.Adam(params, lr=0.005)
     # optimizer = O.SGD(params, lr=lr)
     # scheduler = O.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=0.9)
     # scheduler = O.lr_scheduler.StepLR(optimizer=optimizer, step_size=100, gamma=0.6)

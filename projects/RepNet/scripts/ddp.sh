@@ -16,7 +16,7 @@ then
 fi
 
 data_root=/data/datasets/cv/countix
-from_path=$data_root/last8.pt
+from_path=$data_root/lastx.pt
 save_path=$data_root/last8.pt
 
 # debug

@@ -6,7 +6,7 @@ import requests
 import os
 
 
-def read_video(video_filename, width=224, height=224, rot=None, rm_still=False, area_rate_thres=0.0625):
+def read_video(video_filename, width=224, height=224, rot=None, progress_cb=None, rm_still=False, area_rate_thres=0.0625):
     """Read video from file."""
     cap = cv2.VideoCapture(video_filename)
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -15,10 +15,10 @@ def read_video(video_filename, width=224, height=224, rot=None, rm_still=False, 
     pbar = tqdm(total=n_frames, desc=f"Getting frames from {video_filename} ...")
 
     if rm_still: # remove still frames
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         pre_frame = None
-        area_thres = area_rate_thres * width * height
+        area_thres = area_rate_thres * w * h
     frames = []
     still_frames = []
     if cap.isOpened():
@@ -49,6 +49,10 @@ def read_video(video_filename, width=224, height=224, rot=None, rm_still=False, 
             else:
                 frames.append(frame_rgb)
             frame_idx += 1
+
+            if progress_cb:
+                if frame_idx % 100 == 0:
+                    progress_cb(round((100 * float(frame_idx)) / n_frames, 2))
 
             pbar.update()
     pbar.close()
