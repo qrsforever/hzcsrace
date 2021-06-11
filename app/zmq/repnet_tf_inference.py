@@ -23,6 +23,7 @@ from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)
 from raceai.utils.misc import ( # noqa
         race_oss_client,
         race_object_put,
+        race_object_remove,
         race_report_result,
         race_data)
 
@@ -104,6 +105,9 @@ def inference(model, opt):
     shutil.rmtree(outdir, ignore_errors=True)
     os.makedirs(outdir, exist_ok=True)
 
+    if not _DEBUG_:
+        race_object_remove(osscli, outdir[1:] + '/', bucket_name='raceai')
+
     def _video_read_progress(x):
         resdata['progress'] = x * 0.2
         # Logger.info(resdata['progress'])
@@ -145,27 +149,32 @@ def inference(model, opt):
 
     all_frames_count = len(frames) + len(still_frames)
     is_still_frames = [False] * all_frames_count
-    if rm_still and len(still_frames) > 0:
-        # final_frames = [None] * all_frames_count
-        final_within_period = [.0] * all_frames_count
-        final_per_frame_counts = [.0] * all_frames_count
-        i, j = 0, 0
-        for k in range(all_frames_count):
-            if j < len(still_frames) and k == still_frames[j][0]:
-                # final_frames[k] = still_frames[j][1]
-                is_still_frames[k] = True
-                j += 1
-            elif i < len(frames):
-                # final_frames[k] = frames[i]
-                final_within_period[k] = within_period[i]
-                final_per_frame_counts[k] = per_frame_counts[i]
-                i += 1
-            else:
-                raise '%d vs %d vs %d' % (i, j, k)
-        # frames = final_frames
-        within_period = final_within_period
-        per_frame_counts = np.asarray(final_per_frame_counts)
+    stride_skip_mask = [True] * all_frames_count
+
+    # final_frames = [None] * all_frames_count
+    final_within_period = [.0] * all_frames_count
+    final_per_frame_counts = [.0] * all_frames_count
+    i, j = 0, 0
+    for k in range(all_frames_count):
+        if j < len(still_frames) and k == still_frames[j][0]:
+            # final_frames[k] = still_frames[j][1]
+            is_still_frames[k] = True
+            j += 1
+        elif i < len(frames):
+            # final_frames[k] = frames[i]
+            final_within_period[k] = within_period[i]
+            final_per_frame_counts[k] = per_frame_counts[i]
+            if i % chosen_stride == 0:
+                stride_skip_mask[k] = False
+            i += 1
+        else:
+            raise '%d vs %d vs %d' % (i, j, k)
+    # frames = final_frames
+    within_period = final_within_period
+    per_frame_counts = np.asarray(final_per_frame_counts)
     sum_counts = np.cumsum(per_frame_counts)
+
+    del frames
 
     json_result = {}
     json_result['period'] = pred_period
@@ -191,22 +200,22 @@ def inference(model, opt):
     json_result['frames_period'] = frames_info
 
     prefix = 'https://raceai.s3.didiyunapi.com'
-    if save_video:
-        outfile = os.path.join(outdir, 'repnet_tf-target.mp4')
+    if save_video or best_stride_video:
         cap = cv2.VideoCapture(opt.video)
         fps = cap.get(cv2.CAP_PROP_FPS)
-        fcnts = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fmt = cv2.VideoWriter_fourcc(*'mp4v')
-        vid = cv2.VideoWriter(outfile, fmt, fps, (width, height))
+        if save_video:
+            outfile = os.path.join(outdir, 'repnet_tf-target.mp4')
+            vid = cv2.VideoWriter(outfile, fmt, fps, (width, height))
+            resdata['target_mp4'] = prefix + outfile
+            json_result['target_mp4'] = prefix + outfile
         if best_stride_video:
             out = os.path.join(outdir, 'repnet_tf-target-stride.mp4')
             stride_vid = cv2.VideoWriter(out, fmt, fps, (width, height))
             resdata['stride_mp4'] = prefix + out
             json_result['stride_mp4'] = prefix + out
-        resdata['target_mp4'] = prefix + outfile
-        json_result['target_mp4'] = prefix + outfile
         if cap.isOpened():
             idx = 0
             while True:
@@ -217,13 +226,15 @@ def inference(model, opt):
                         'count: %.3f' % sum_counts[idx], (20, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 0, 255), 2)
                 if idx % 100 == 0:
-                    _video_save_progress(round((100 * float(idx)) / fcnts, 2))
-                if best_stride_video and idx % chosen_stride == 0:
+                    _video_save_progress(round((100 * float(idx)) / all_frames_count, 2))
+                if save_video:
+                    vid.write(frame_bgr)
+                if best_stride_video and not stride_skip_mask[idx]:
                     stride_vid.write(frame_bgr)
-                vid.write(frame_bgr)
                 idx += 1
-        vid.release()
         cap.release()
+        if save_video:
+            vid.release()
         if best_stride_video:
             stride_vid.release()
         mkvid_time = time.time() - s_time - infer_time

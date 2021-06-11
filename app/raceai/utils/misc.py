@@ -161,6 +161,8 @@ def race_object_put(client, local_path,
             content_type = 'text/csv'
         elif local_file.endswith('.mp4'): 
             content_type = 'video/mp4'
+        elif local_file.endswith('.avi'): 
+            content_type = 'video/avi'
         with open(local_file, 'rb') as file_data:
             btime = time.time()
             etag = client.put_object(bucket_name,
