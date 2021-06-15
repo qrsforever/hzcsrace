@@ -277,7 +277,12 @@ def get_counts(model, frames, strides, batch_size,
 
         per_frame_counts *= np.asarray(within_period_binary)
 
-        pred_period = seq_len / np.sum(per_frame_counts)
+        # QRS
+        cnts = np.sum(per_frame_counts)
+        if cnts > 0:
+            pred_period = seq_len / np.sum(per_frame_counts)
+        else:
+            pred_period = seq_len * 0.0
 
     if pred_score < threshold:
         print('No repetitions detected in video as score '

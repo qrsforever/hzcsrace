@@ -6,7 +6,7 @@ import requests
 import os
 
 
-def read_video(video_filename, width=224, height=224, rot=None, progress_cb=None, rm_still=False, area_rate_thres=0.0625):
+def read_video(video_filename, width=224, height=224, rot=None, progress_cb=None, rm_still=False, area_rate_thres=0.0025):
     """Read video from file."""
     cap = cv2.VideoCapture(video_filename)
     fps = cap.get(cv2.CAP_PROP_FPS)

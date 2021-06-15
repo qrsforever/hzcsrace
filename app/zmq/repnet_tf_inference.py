@@ -87,14 +87,14 @@ def inference(model, opt):
     rm_still = False
     if 'rm_still' in opt:
         rm_still = opt.rm_still
-    area_rate_thres = 0.0625
+    area_rate_thres = 0.002
     if 'area_rate_threshold' in opt:
         area_rate_thres = opt.area_rate_threshold
     best_stride_video = False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
 
-    if save_video:
+    if save_video or best_stride_video:
         model_progress_weight = 0.40
     else:
         model_progress_weight = 0.78
@@ -248,6 +248,7 @@ def inference(model, opt):
         race_object_put(osscli, outdir, bucket_name='raceai')
     resdata['progress'] = 100.0
     resdata['target_json'] = prefix + json_result_file
+    Logger.info(json.dumps(resdata))
     _report_result(msgkey, resdata)
 
 
