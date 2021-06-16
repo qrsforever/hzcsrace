@@ -65,6 +65,17 @@ class JsonBase64DataLoader(BaseDataLoader):
         super().__init__(file_paths, cfg)
 
 
+class ListBase64DataLoader(BaseDataLoader):
+    def __init__(self, cfg):
+        file_paths = []
+        for b64str in cfg.data_source:
+            imgpath = os.path.join('/tmp', 'b64_%02d.png' % (time.time() % 99))
+            with open(imgpath, 'wb') as fout:
+                fout.write(base64.b64decode(b64str.split(',')[-1]))
+            file_paths.append(imgpath)
+        super().__init__(file_paths, cfg)
+
+
 class PathListDataLoader(BaseDataLoader):
     def __init__(self, cfg):
         super().__init__(cfg.data_source, cfg)

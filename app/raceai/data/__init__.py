@@ -154,10 +154,36 @@ class JsonFileDataset(ClsRaceDataset):
         return image_list, label_list
 
 
+class PredictListImageRaw(RawRaceDataset):
+    def data_reader(self, sources):
+        if isinstance(sources, str):
+            return [self.data_path(sources)], ['-1']
+        images = []
+        labels = []
+        if isinstance(sources, (list, tuple)):
+            for item in sources:
+                if isinstance(item, str):
+                    images.append(self.data_path(item))
+                    labels.append('-1')
+                elif isinstance(item, dict):
+                    if 'image_path' not in item:
+                        raise ValueError('not found image_path')
+                    images.append(self.data_path(item['image_path']))
+                    if 'image_id' in item:
+                        labels.append(item['image_id'])
+                    else:
+                        labels.append('-1')
+                else:
+                    assert RuntimeError(type(item))
+        else:
+            assert RuntimeError(type(sources))
+        return images, labels
+
+
 # class PredictDirectoryImageRaw(RaceDataset):
 #     def __init__(self, img_path, cfg):
 #         self.images = self.data_reader(img_path)
-# 
+#
 #     def data_reader(self, path):
 #         extensions = ('.jpg', '.jpeg', '.png', '.bmp', '.webp')
 #         image_list = []
@@ -166,14 +192,14 @@ class JsonFileDataset(ClsRaceDataset):
 #                 continue
 #             image_list.append(f'{path}/{filename}')
 #         return image_list
-# 
+#
 #     def __getitem__(self, index):
 #         return cv2.imread(self.images[index], cv2.IMREAD_UNCHANGED), self.images[index]
-# 
+#
 #     def __len__(self):
 #         return len(self.images)
-# 
-# 
+#
+#
 # class PredictSingleImageRaw(PredictDirectoryImageRaw):
 #     def data_reader(self, path):
 #         if isinstance(path, (list, tuple)):

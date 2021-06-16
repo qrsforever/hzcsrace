@@ -9,6 +9,7 @@ import base64 # noqa
 import io # noqa
 import cv2 # noqa
 import shutil
+import numpy as np
 import PIL.Image as Image # noqa
 import matplotlib.pyplot as plt # noqa
 
@@ -179,6 +180,30 @@ def neural_style_transfer(cfg):
         bio.seek(0)
         return {'errno': 0, 'result': {
             'b64img': base64.b64encode(bio.read()).decode()}}
+
+
+@catch_error
+@FunctionRegister.register('plate_color.inference')
+def plate_color_test(cfg):
+    # Data
+    data_loader_class = race_load_class(cfg.data.class_name)
+    data_loader = data_loader_class(cfg.data.params).get()
+
+    # Model
+    test_model = race_load_class(cfg.model.class_name)(cfg.model.params)
+
+    results = []
+    for path, imgid in data_loader:
+        result = {}
+        counts, masked = test_model.extract_features(path)
+        results.append({
+            'image_id': imgid,
+            'image_path': path,
+            'probs': (counts/np.sum(counts)).tolist(),
+            'argmax': int(np.argmax(counts))
+            })
+
+    return {'errno': 0, 'result': results}
 
 
 if __name__ == "__main__":
