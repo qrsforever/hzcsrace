@@ -100,6 +100,15 @@ class PlateColorFeatures(object):
 
     def extract_features(self, path):
         img_bgr = cv2.imread(path)
+        img_bgr = cv2.copyMakeBorder(
+            img_bgr,
+            top=2,
+            bottom=2,
+            left=2,
+            right=2,
+            borderType=cv2.BORDER_CONSTANT,
+            value=[255, 255, 255])
+
         img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         img_blur = cv2.GaussianBlur(img_gray, (15, 15), 0)
         img_blur = cv2.GaussianBlur(img_blur, (3, 3), 0)
