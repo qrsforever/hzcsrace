@@ -1,0 +1,45 @@
+FROM hzcsai_com/raceai_base
+
+ARG VENDOR
+ARG PROJECT
+ARG REPOSITORY
+ARG TAG
+ARG DATE
+ARG VERSION
+ARG URL
+ARG COMMIT
+ARG BRANCH
+
+LABEL org.label-schema.schema-version="1.0" \
+      org.label-schema.build-date=$DATE \
+      org.label-schema.name=$REPOSITORY \
+      org.label-schema.description="HZCS RACE Sense" \
+      org.label-schema.url="https://www.hzcsai.com" \
+      org.label-schema.vcs-url=$URL \
+      org.label-schema.vcs-ref=$COMMIT \
+      org.label-schema.vcs-branch=$BRANCH \
+      org.label-schema.vendor=$VENDOR \
+      org.label-schema.version=$VERSION
+
+LABEL com.nvidia.volumes.needed="nvidia_driver"
+
+WORKDIR /raceai
+
+COPY projects/sense /raceai/codes/projects/sense
+
+ENV PYTHONPATH=/raceai/codes/app:/raceai/codes/projects/sense:$PYTHONPATH
+
+RUN $APT_INSTALL libyaml-dev locales
+RUN $PIP_INSTALL -U pip && \
+        $PIP_INSTALL tqdm easydict pyyaml \
+        ffmpeg-python natsort \
+        queuelib              \
+        docopt                \
+        Pillow                \
+        ffmpeg-python         \
+        natsort               \
+        Minio
+
+SHELL ["/bin/bash"]
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

@@ -75,6 +75,12 @@ do
                 --ckpt /ckpts \
                 --out /outputs
             ;;
+        "sense")
+            python3 zmq/sense_inference.py \
+            --topic zmq.sense.inference \
+            --custom_classifier /ckpts \
+            --outdir /outputs
+            ;;
         *)
             echo "SS_MODULE set error"
             break;;
