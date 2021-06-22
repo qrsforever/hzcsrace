@@ -10,6 +10,7 @@ import shutil
 
 import torch
 
+import sense.display
 from collections import Callable
 from sense.controller import Controller
 from sense.downstream_tasks.nn_utils import LogisticRegression
@@ -23,14 +24,16 @@ from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)
 from raceai.utils.misc import (
         race_oss_client,
         race_object_put,
-        race_report_result, 
+        race_report_result,
         race_data)
 
 
 race_set_loglevel('info')
 race_set_logfile('/tmp/raceai-sense.log')
 
-_DEBUG_ = True
+_DEBUG_ = False
+
+S3PREFIX = 'https://raceai.s3.didiyunapi.com'
 
 context = zmq.Context()
 zmqsub = context.socket(zmq.SUB)
@@ -42,6 +45,8 @@ osscli = race_oss_client(bucket_name='raceai')
 parser = argparse.ArgumentParser(description='Sense Config')
 parser.add_argument('--topic', type=str, required=True, help='zmq topic')
 parser.add_argument('--custom_classifier', type=str, required=True, help='classifer ckpts')
+parser.add_argument('--outdir', type=str, default='/tmp', help='output dir')
+
 
 args = parser.parse_args()
 
@@ -55,8 +60,29 @@ def _report_result(msgkey, resdata):
 
 
 class ResultCallback(Callable):
+    def __init__(self, net, report_cb):
+        self.net = net
+        self.cum_frames = 0
+        self.num_frames = 0
+        self.report_cb = report_cb
+        self.results = []
+
     def __call__(self, out):
+        self.cum_frames += 1
+        info = {
+                'image_id' : '%d.jpg' % (self.cum_frames - 1),
+                'at_time': round(self.cum_frames / self.net.fps , 3),
+        }
+        if 'sorted_predictions' in out:
+            info['sorted_predictions'] = {
+                    l: round(float(s), 3) for l, s in out['sorted_predictions']}
+        self.results.append(info)
+        self.report_cb(round(98 * self.cum_frames / self.num_frames, 2))
         return True
+
+
+def display_fn(img):
+    pass
 
 
 def inference(model, opt):
@@ -75,6 +101,8 @@ def inference(model, opt):
     os.makedirs(outputpath, exist_ok=True)
     args.outputpath = outputpath
 
+    resdata = {'pigeon': dict(opt.pigeon), 'task': args.topic, 'errno': 0}
+
     if 'save_video' in opt:
         path_out = os.path.join(outputpath, 'sense-target.mp4')
     else:
@@ -84,16 +112,55 @@ def inference(model, opt):
         PostprocessClassificationOutput(INT2LAB, smoothing=4)
     ]
 
+    display_ops = [
+            sense.display.DisplayFPS(expected_camera_fps=model.fps,
+                expected_inference_fps=model.fps / model.step_size),
+            sense.display.DisplayTopKClassificationOutputs(top_k=1, threshold=0.1),
+    ]
+    display_results = sense.display.DisplayResults(title='sense', display_ops=display_ops, display_fn=display_fn)
+
+    def _report_progress(progress):
+        resdata['progress'] = progress
+        _report_result(msgkey, resdata)
+        Logger.info('progress: %.2f' % progress)
+
+    result_cb = ResultCallback(model, _report_progress)
+
     controller = Controller(
         neural_network=model,
         post_processors=postprocessor,
-        results_display=None,
-        callbacks=[ResultCallback()],
+        results_display=display_results,
+        callbacks=[result_cb],
         path_in=race_data(opt.video),
         path_out=path_out,
         use_gpu=True,
     )
+    result_cb.num_frames = len(controller.video_stream.video_source._frames)
     controller.run_inference()
+
+    json_result = {}
+    w, h = model.expected_frame_size
+    fps, step_size = model.fps, model.step_size
+
+    json_result['frame_width'] = w
+    json_result['frame_height'] = h
+    json_result['model_step'] = step_size
+    json_result['fps'] = fps
+    json_result['num_frames'] = result_cb.num_frames
+    json_result['action_recognition'] = result_cb.results
+
+    json_result_file = os.path.join(outputpath, 'sense-results.json')
+    with open(json_result_file, 'w') as fw:
+        fw.write(json.dumps(json_result, indent=4))
+
+    if not _DEBUG_:
+        race_object_put(osscli, outputpath, bucket_name='raceai')
+    resdata['progress'] = 100.0
+    resdata['target_json'] = S3PREFIX + json_result_file
+    if path_out:
+        resdata['target_mp4'] = S3PREFIX + path_out
+    Logger.info(json.dumps(resdata))
+    _report_result(msgkey, resdata)
 
 
 if __name__ == "__main__":
@@ -133,8 +200,9 @@ if __name__ == "__main__":
                 time.sleep(0.01)
         else:
             zmq_cfg = {
-                "pigeon": {"msgkey": "123"},
-                "video": "https://raceai.s3.didiyunapi.com/data/media/videos/sense_test.mp4"
+                    "pigeon": {"msgkey": "123", "user_code": "123"},
+                    "video": "https://raceai.s3.didiyunapi.com/data/media/videos/sense_test.mp4",
+                    "save_video": True
             }
             zmq_cfg = OmegaConf.create(zmq_cfg)
             Logger.info(zmq_cfg)

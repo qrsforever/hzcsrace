@@ -80,7 +80,11 @@ class VideoSource:
             video.append(frame)
             ret, frame = self._cam.read()
 
-        return uniform_frame_sample(np.array(video), target_fps / video_fps)
+        frames = uniform_frame_sample(np.array(video), target_fps / video_fps)
+
+        print("video_fps[%s],target_fsp[%s], frames[%d vs %d]" % (
+            video_fps, target_fps, len(video), len(frames)))
+        return frames
 
     def _get_frame(self):
         if self._frames is not None:

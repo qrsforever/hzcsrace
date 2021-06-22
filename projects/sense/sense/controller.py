@@ -22,7 +22,7 @@ class Controller:
             self,
             neural_network: RealtimeNeuralNet,
             post_processors: Union[PostProcessor, List[PostProcessor]],
-            results_display: DisplayResults = None,
+            results_display: DisplayResults,
             callbacks: Optional[List[Callable]] = None,
             camera_id: int = 0,
             path_in: Optional[str] = None,
@@ -111,8 +111,7 @@ class Controller:
 
                 prediction_postprocessed = self.postprocess_prediction(prediction)
 
-                if self.results_display:
-                    self.display_prediction(img, prediction_postprocessed)
+                self.display_prediction(img, prediction_postprocessed)
 
                 # Apply callbacks
                 if not all(callback(prediction_postprocessed) for callback in self.callbacks):
@@ -122,7 +121,7 @@ class Controller:
                 runtime_error = e
                 break
 
-            if self.results_display:
+            if not self.results_display.display_fn:
                 # Press escape to exit
                 if cv2.waitKey(1) == 27:
                     break
@@ -151,8 +150,9 @@ class Controller:
             if self.video_recorder is None or self.video_recorder_raw is None:
                 self._instantiate_video_recorders(img_augmented, img)
 
-            self.video_recorder.write(img_augmented)
-            self.video_recorder_raw.write(img)
+            if self.results_display:
+                self.video_recorder.write(img_augmented)
+            # self.video_recorder_raw.write(img)
 
     def _start_inference(self):
         print("Starting inference")
@@ -172,20 +172,21 @@ class Controller:
 
     def _stop_inference(self):
         print("Stopping inference")
-        cv2.destroyAllWindows()
+        if not self.results_display.display_fn:
+            cv2.destroyAllWindows()
         self.video_stream.stop()
         self.inference_engine.stop()
 
         if self.video_recorder is not None:
             self.video_recorder.release()
 
-        if self.video_recorder_raw is not None:
-            self.video_recorder_raw.release()
+        # if self.video_recorder_raw is not None:
+        #     self.video_recorder_raw.release()
 
     def _instantiate_video_recorders(self, img_augmented, img_raw):
         self.video_recorder = cv2.VideoWriter(self.path_out, 0x7634706d, self.inference_engine.fps,
                                               (img_augmented.shape[1], img_augmented.shape[0]))
 
-        path_raw = self.path_out.replace('.mp4', '_raw.mp4')
-        self.video_recorder_raw = cv2.VideoWriter(path_raw, 0x7634706d, self.inference_engine.fps,
-                                                  (img_raw.shape[1], img_raw.shape[0]))
+        # path_raw = self.path_out.replace('.mp4', '_raw.mp4')
+        # self.video_recorder_raw = cv2.VideoWriter(path_raw, 0x7634706d, self.inference_engine.fps,
+        #                                           (img_raw.shape[1], img_raw.shape[0]))
