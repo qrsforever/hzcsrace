@@ -48,7 +48,7 @@ RUN sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.d
 RUN ln -s /usr/bin/python3 /usr/bin/python
 
 RUN $PIP_INSTALL  -U pip && \
-        $PIP_INSTALL setproctitle && \
+        $PIP_INSTALL setproctitle requests && \
         $PIP_INSTALL scikit-build zmq protobuf pyhocon omegaconf && \
         $PIP_INSTALL cython opencv-python opencv-contrib-python && \
         $PIP_INSTALL torch==1.7.1+cu101 torchvision==0.8.2+cu101 torchaudio==0.7.2 -f \

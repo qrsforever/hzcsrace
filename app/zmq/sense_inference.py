@@ -1,13 +1,22 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 
 import argparse
 import os
+import json
 import time
 import zmq
 import shutil
 
 import torch
-from tqdm import tqdm
 
+from collections import Callable
+from sense.controller import Controller
+from sense.downstream_tasks.nn_utils import LogisticRegression
+from sense.downstream_tasks.nn_utils import Pipe
+from sense.downstream_tasks.postprocess import PostprocessClassificationOutput
+from sense.loading import build_backbone_network
+from sense.loading import load_backbone_model_from_config
 
 from omegaconf import OmegaConf
 from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)
@@ -21,7 +30,7 @@ from raceai.utils.misc import (
 race_set_loglevel('info')
 race_set_logfile('/tmp/raceai-sense.log')
 
-_DEBUG_ = False
+_DEBUG_ = True
 
 context = zmq.Context()
 zmqsub = context.socket(zmq.SUB)
@@ -30,36 +39,11 @@ zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
 osscli = race_oss_client(bucket_name='raceai')
 
 """----------------------------- Demo options -----------------------------"""
-parser = argparse.ArgumentParser(description='AlphaPose Demo')
-parser.add_argument('--topic', type=str, default='123',
-                    help='zmq topic')
+parser = argparse.ArgumentParser(description='Sense Config')
+parser.add_argument('--topic', type=str, required=True, help='zmq topic')
+parser.add_argument('--custom_classifier', type=str, required=True, help='classifer ckpts')
 
 args = parser.parse_args()
-cfg = update_config(args.cfg)
-
-args.gpus = [int(i) for i in args.gpus.split(',')] if torch.cuda.device_count() >= 1 else [-1]
-args.device = torch.device("cuda:" + str(args.gpus[0]) if args.gpus[0] >= 0 else "cpu")
-args.detbatch = args.detbatch * len(args.gpus)
-args.posebatch = args.posebatch * len(args.gpus)
-args.tracking = args.pose_track or args.pose_flow or args.detector == 'tracker'
-
-if not args.sp:
-    torch.multiprocessing.set_start_method('forkserver', force=True)
-    torch.multiprocessing.set_sharing_strategy('file_system')
-
-
-def print_finish_info():
-    Logger.info('===========================> Finish Model Running.')
-    if (args.save_img or args.save_video) and not args.vis_fast:
-        Logger.info('===========================> Rendering remaining images in the queue...')
-        Logger.info('===========================> If this step takes too long, you can enable the --vis_fast flag to use fast rendering (real-time).')
-
-
-def loop():
-    n = 0
-    while True:
-        yield n
-        n += 1
 
 
 def _report_result(msgkey, resdata):
@@ -70,33 +54,12 @@ def _report_result(msgkey, resdata):
         pass
 
 
-def result_report(resdata, res):
-    im_name = res['imgname']
-    for human in res['result']:
-        result = {}
-        keypoints = []
-        result['image_id'] = int(os.path.basename(im_name).split('.')[0].split('_')[-1])
-        result['category_id'] = 1
-
-        kp_preds = human['keypoints']
-        kp_scores = human['kp_score']
-        pro_scores = human['proposal_score']
-        for n in range(kp_scores.shape[0]):
-            keypoints.append(float(kp_preds[n, 0]))
-            keypoints.append(float(kp_preds[n, 1]))
-            keypoints.append(float(kp_scores[n]))
-        result['keypoints'] = keypoints
-        result['score'] = float(pro_scores)
-        if 'box' in human.keys():
-            result['box'] = human['box']
-        if 'idx' in human.keys():
-            result['idx'] = human['idx']
-        resdata['result'].append(result)
-
-        _report_result(resdata['pigeon']['msgkey'], resdata)
+class ResultCallback(Callable):
+    def __call__(self, out):
+        return True
 
 
-def inference(pose_model, det_model, opt):
+def inference(model, opt):
     msgkey = args.topic
     if 'msgkey' in opt.pigeon:
         msgkey = opt.pigeon.msgkey
@@ -112,135 +75,25 @@ def inference(pose_model, det_model, opt):
     os.makedirs(outputpath, exist_ok=True)
     args.outputpath = outputpath
 
-    if 'qsize' in opt:
-        args.qsize = opt.qsize
-    else:
-        args.qsize = 1024
-
-    if 'save_img' in opt:
-        args.save_img = opt.save_img
-    else:
-        args.save_img = False
-
     if 'save_video' in opt:
-        args.save_video = opt.save_video
+        path_out = os.path.join(outputpath, 'sense-target.mp4')
     else:
-        args.save_video = False
+        path_out = None
 
-    if 'vis_fast' in opt:
-        args.vis_fast = opt.vis_fast
-    else:
-        args.vis_fast = True
+    postprocessor = [
+        PostprocessClassificationOutput(INT2LAB, smoothing=4)
+    ]
 
-    report_cb = None
-    if 'report_kps' in opt and opt['report_kps']:
-        report_cb = result_report 
-
-    resdata = {'pigeon': dict(opt.pigeon), 'task': args.topic, 'errno': 0}
-
-    # Load detection loader
-    det_loader = DetectionLoader(race_data(opt.video),
-            det_model, cfg, args, batchSize=args.detbatch, mode='video', queueSize=args.qsize)
-    det_worker = det_loader.start() # noqa
-
-    # Init data writer
-    if args.save_video:
-        video_save_opt['savepath'] = os.path.join(outputpath, 'alphapose-target.mp4')
-        video_save_opt.update(det_loader.videoinfo)
-        writer = DataWriter(cfg, args, save_video=True,
-                video_save_opt=video_save_opt, queueSize=args.qsize,
-                result_callback=report_cb, resdata=resdata).start()
-    else:
-        writer = DataWriter(cfg, args, save_video=False, queueSize=args.qsize,
-                result_callback=report_cb, resdata=resdata).start()
-
-    data_len = det_loader.length
-    im_names_desc = tqdm(range(data_len), dynamic_ncols=True, disable=True)
-
-    batchSize = args.posebatch
-    if args.flip:
-        batchSize = int(batchSize / 2)
-    try:
-        writer.resdata['progress'] = 0
-        _report_result(msgkey, resdata)
-        for i in im_names_desc:
-            # heart beating
-            with torch.no_grad():
-                (inps, orig_img, im_name, boxes, scores, ids, cropped_boxes) = det_loader.read()
-                if orig_img is None:
-                    # QRS use it pass error info
-                    if im_name is not None:
-                        resdata['errno'] = -1
-                        resdata['errtext'] = im_name
-                    break
-                if boxes is None or boxes.nelement() == 0:
-                    writer.save(None, None, None, None, None, orig_img, im_name)
-                    continue
-                # Pose Estimation
-                inps = inps.to(args.device)
-                datalen = inps.size(0)
-                leftover = 0
-                if (datalen) % batchSize:
-                    leftover = 1
-                num_batches = datalen // batchSize + leftover
-                hm = []
-                for j in range(num_batches):
-                    inps_j = inps[j * batchSize:min((j + 1) * batchSize, datalen)]
-                    if args.flip:
-                        inps_j = torch.cat((inps_j, flip(inps_j)))
-                    hm_j = pose_model(inps_j)
-                    if args.flip:
-                        hm_j_flip = flip_heatmap(hm_j[int(len(hm_j) / 2):], pose_dataset.joint_pairs, shift=True)
-                        hm_j = (hm_j[0:int(len(hm_j) / 2)] + hm_j_flip) / 2
-                    hm.append(hm_j)
-                hm = torch.cat(hm)
-                if args.pose_track:
-                    boxes,scores,ids,hm,cropped_boxes = track(tracker,args,orig_img,inps,boxes,hm,cropped_boxes,im_name,scores)
-                hm = hm.cpu()
-                writer.save(boxes, scores, ids, hm, cropped_boxes, orig_img, im_name)
-                Logger.info('[%d]/[%d]' % (i + 1, data_len))
-                if i % 50 == 0:
-                    writer.resdata['progress'] = float(96 * (i + 1) / data_len)
-                    _report_result(msgkey, resdata)
-
-        print_finish_info()
-        while(writer.running()):
-            time.sleep(1)
-            Logger.info('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...')
-        writer.stop()
-        det_loader.stop()
-
-        if not _DEBUG_:
-            writer.resdata['progress'] = 100.0
-            prefix = 'https://raceai.s3.didiyunapi.com'
-            resdata['target_json'] = prefix + os.path.join(outputpath, 'alphapose-results.json')
-            if args.save_video:
-                resdata['target_mp4'] = prefix + os.path.join(outputpath, 'alphapose-target.mp4')
-            race_object_put(osscli, outputpath, bucket_name='raceai')
-            Logger.info(resdata)
-            _report_result(msgkey, resdata)
-
-    except Exception as e:
-        Logger.info(repr(e))
-        Logger.info('An error as above occurs when processing the images, please check it')
-        pass
-    except KeyboardInterrupt:
-        print_finish_info()
-        # Thread won't be killed when press Ctrl+C
-        if args.sp:
-            det_loader.terminate()
-            while(writer.running()):
-                time.sleep(1)
-                Logger.info('===========================> Rendering remaining ' + str(writer.count()) + ' images in the queue...')
-            writer.stop()
-        else:
-            # subprocesses are killed, manually clear queues
-
-            det_loader.terminate()
-            writer.terminate()
-            writer.clear_queues()
-            det_loader.clear_queues()
-        raise
+    controller = Controller(
+        neural_network=model,
+        post_processors=postprocessor,
+        results_display=None,
+        callbacks=[ResultCallback()],
+        path_in=race_data(opt.video),
+        path_out=path_out,
+        use_gpu=True,
+    )
+    controller.run_inference()
 
 
 if __name__ == "__main__":
@@ -250,21 +103,20 @@ if __name__ == "__main__":
         race_report_result('add_topic', args.topic)
 
     try:
-        # Load model
-        Logger.info('Loading detector model...')
-        det_model = get_detector(args)
-        det_model.load_model()
-        pose_model = builder.build_sppe(cfg.MODEL, preset_cfg=cfg.DATA_PRESET)
-        Logger.info('Loading pose model from %s...' % (args.checkpoint,))
-        pose_model.load_state_dict(torch.load(args.checkpoint, map_location=args.device))
-        pose_dataset = builder.retrieve_dataset(cfg.DATASET.TRAIN)
-        if args.pose_track:
-            tracker = Tracker(tcfg, args)
-        if len(args.gpus) > 1:
-            pose_model = torch.nn.DataParallel(pose_model, device_ids=args.gpus).to(args.device)
-        else:
-            pose_model.to(args.device)
-        pose_model.eval()
+        backbone_model_config, backbone_weights = load_backbone_model_from_config(args.custom_classifier)
+        checkpoint_classifier = torch.load(os.path.join(args.custom_classifier, 'best_classifier.checkpoint'))
+        backbone_network = build_backbone_network(backbone_model_config, backbone_weights,
+                                                  weights_finetuned=checkpoint_classifier)
+        with open(os.path.join(args.custom_classifier, 'label2int.json')) as file:
+            class2int = json.load(file)
+        INT2LAB = {value: key for key, value in class2int.items()}
+
+        gesture_classifier = LogisticRegression(num_in=backbone_network.feature_dim,
+                                                num_out=len(INT2LAB))
+        gesture_classifier.load_state_dict(checkpoint_classifier)
+        gesture_classifier.eval()
+
+        model = Pipe(backbone_network, gesture_classifier)
 
         if not _DEBUG_:
             while True:
@@ -277,16 +129,16 @@ if __name__ == "__main__":
                 if 'pigeon' not in zmq_cfg:
                     continue
                 Logger.info(zmq_cfg.pigeon)
-                inference(pose_model, det_model, zmq_cfg)
+                inference(model, zmq_cfg)
                 time.sleep(0.01)
         else:
             zmq_cfg = {
                 "pigeon": {"msgkey": "123"},
-                "video": "https://raceai.s3.didiyunapi.com/data/media/videos/alphapose_test.mp4"
+                "video": "https://raceai.s3.didiyunapi.com/data/media/videos/sense_test.mp4"
             }
             zmq_cfg = OmegaConf.create(zmq_cfg)
             Logger.info(zmq_cfg)
-            inference(pose_model, det_model, zmq_cfg)
+            inference(model, zmq_cfg)
     finally:
         if _DEBUG_:
             race_report_result('del_topic', args.topic)

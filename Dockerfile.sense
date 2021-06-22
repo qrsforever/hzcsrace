@@ -31,7 +31,7 @@ ENV PYTHONPATH=/raceai/codes/app:/raceai/codes/projects/sense:$PYTHONPATH
 
 RUN $APT_INSTALL libyaml-dev locales
 RUN $PIP_INSTALL -U pip && \
-        $PIP_INSTALL tqdm easydict pyyaml \
+        $PIP_INSTALL tqdm easydict pyyaml requests \
         ffmpeg-python natsort \
         queuelib              \
         docopt                \

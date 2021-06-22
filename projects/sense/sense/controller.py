@@ -22,7 +22,7 @@ class Controller:
             self,
             neural_network: RealtimeNeuralNet,
             post_processors: Union[PostProcessor, List[PostProcessor]],
-            results_display: DisplayResults,
+            results_display: DisplayResults = None,
             callbacks: Optional[List[Callable]] = None,
             camera_id: int = 0,
             path_in: Optional[str] = None,
@@ -111,7 +111,8 @@ class Controller:
 
                 prediction_postprocessed = self.postprocess_prediction(prediction)
 
-                self.display_prediction(img, prediction_postprocessed)
+                if self.results_display:
+                    self.display_prediction(img, prediction_postprocessed)
 
                 # Apply callbacks
                 if not all(callback(prediction_postprocessed) for callback in self.callbacks):
@@ -121,9 +122,10 @@ class Controller:
                 runtime_error = e
                 break
 
-            # Press escape to exit
-            if cv2.waitKey(1) == 27:
-                break
+            if self.results_display:
+                # Press escape to exit
+                if cv2.waitKey(1) == 27:
+                    break
 
             # Press cancel on sense-studio testing page to stop inference
             if self.stop_event and self.stop_event.is_set():
@@ -164,7 +166,9 @@ class Controller:
         self.frame_index = 0
         self.inference_engine.start()
         self.video_stream.start()
-        self.results_display.initialize()
+
+        if self.results_display:
+            self.results_display.initialize()
 
     def _stop_inference(self):
         print("Stopping inference")

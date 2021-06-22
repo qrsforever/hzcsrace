@@ -12,7 +12,7 @@ TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 VENDOR=hzcsai_com
 PROJECT=raceai_sense
 REPOSITORY="$VENDOR/$PROJECT"
-NAME=${PROJECT}-sense
+NAME=${PROJECT}
 
 minio_server_url='s3-internal.didiyunapi.com'
 minio_access_key='AKDD002E38WR1J7RMPTGRIGNVCVINY'
@@ -31,6 +31,7 @@ __start_raceai()
         --env MINIO_SECRET_KEY=$minio_secret_key \
         --volume /raceai/data:/raceai/data \
         --volume /raceai/data/ckpts/sense:/ckpts \
+        --volume /raceai/data/ckpts/sense/resources:/raceai/codes/projects/sense/resources \
         --volume /raceai/data/users/outputs:/outputs \
         --volume /data/pretrained/cv:/root/.cache/torch/hub/checkpoints \
         --volume $TOP_DIR/app/configs/sense:/configs \
