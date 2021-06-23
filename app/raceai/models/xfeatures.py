@@ -110,8 +110,9 @@ class PlateColorFeatures(object):
             value=[255, 255, 255])
 
         img_gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        img_blur = cv2.GaussianBlur(img_gray, (15, 15), 0)
-        img_blur = cv2.GaussianBlur(img_blur, (3, 3), 0)
+        img_gray = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8)).apply(img_gray)
+        # img_blur = cv2.GaussianBlur(img_gray, (15, 15), 0)
+        img_blur = cv2.GaussianBlur(img_gray, (3, 3), 0)
 
         img_canny = cv2.Canny(img_blur, 30, 150)
 
