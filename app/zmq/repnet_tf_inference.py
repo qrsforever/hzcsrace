@@ -199,7 +199,9 @@ def inference(model, opt):
         })
     json_result['frames_period'] = frames_info
 
-    prefix = 'https://raceai.s3.didiyunapi.com'
+    oss_f = os.path.basename(opt.video)
+    oss_d = os.path.dirname(os.path.dirname(opt.video))
+    prefix = os.path.join(oss_d, 'outputs', oss_f.split('.')[0])
     if save_video or best_stride_video:
         cap = cv2.VideoCapture(opt.video)
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -209,13 +211,13 @@ def inference(model, opt):
         if save_video:
             outfile = os.path.join(outdir, 'repnet_tf-target.mp4')
             vid = cv2.VideoWriter(outfile, fmt, fps, (width, height))
-            resdata['target_mp4'] = prefix + outfile
-            json_result['target_mp4'] = prefix + outfile
+            resdata['target_mp4'] = os.path.join(prefix, os.path.basename(outfile))
+            json_result['target_mp4'] = resdata['target_mp4']
         if best_stride_video:
-            out = os.path.join(outdir, 'repnet_tf-target-stride.mp4')
-            stride_vid = cv2.VideoWriter(out, fmt, fps, (width, height))
-            resdata['stride_mp4'] = prefix + out
-            json_result['stride_mp4'] = prefix + out
+            outfile2 = os.path.join(outdir, 'repnet_tf-target-stride.mp4')
+            stride_vid = cv2.VideoWriter(outfile2, fmt, fps, (width, height))
+            resdata['stride_mp4'] =  os.path.join(prefix, os.path.basename(outfile2))
+            json_result['stride_mp4'] = resdata['stride_mp4']
         if cap.isOpened():
             idx = 0
             while True:
@@ -245,9 +247,13 @@ def inference(model, opt):
         fw.write(json.dumps(json_result, indent=4))
 
     if not _DEBUG_:
-        race_object_put(osscli, outdir, bucket_name='raceai')
+        index = len('https://frepai.s3.didiyunapi.com')
+        prefix_map = [outdir, prefix[index:]]
+        Logger.info(prefix_map)
+        result = race_object_put(osscli, outdir,
+                bucket_name='frepai', prefix_map=prefix_map)
     resdata['progress'] = 100.0
-    resdata['target_json'] = prefix + json_result_file
+    resdata['target_json'] = os.path.join(prefix, os.path.basename(json_result_file))
     Logger.info(json.dumps(resdata))
     _report_result(msgkey, resdata)
 
