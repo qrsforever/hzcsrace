@@ -113,7 +113,7 @@ def mkdir_p(path):
 
 
 def race_oss_client(server_url=None, access_key=None, secret_key=None,
-        region='gz', bucket_name='raceai'):
+        region='gz', bucket_name=None):
     if server_url is None:
         server_url = os.environ.get('MINIO_SERVER_URL')
     if access_key is None:
@@ -129,8 +129,9 @@ def race_oss_client(server_url=None, access_key=None, secret_key=None,
         secret_key=secret_key,
         secure=True)
 
-    if not mc.bucket_exists(bucket_name):
-        mc.make_bucket(bucket_name, location=region)
+    if bucket_name:
+        if not mc.bucket_exists(bucket_name):
+            mc.make_bucket(bucket_name, location=region)
 
     return mc
 

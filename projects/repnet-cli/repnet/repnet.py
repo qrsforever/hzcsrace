@@ -284,6 +284,8 @@ def get_counts(model, frames, strides, batch_size,
         else:
             pred_period = seq_len * 0.0
 
+    del frames
+
     if pred_score < threshold:
         print('No repetitions detected in video as score '
               '%0.2f is less than threshold %0.2f.' % (pred_score, threshold))

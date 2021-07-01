@@ -30,12 +30,12 @@ from raceai.utils.misc import ( # noqa
 race_set_loglevel('info')
 race_set_logfile('/tmp/raceai-repnet_tf.log')
 
-_DEBUG_ = False
+_RELEASE_ = True
 context = zmq.Context()
 zmqsub = context.socket(zmq.SUB)
 zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
 
-osscli = race_oss_client(bucket_name='raceai')
+osscli = race_oss_client()
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("--path", default='', type=str, help="Input video file path or root.")
@@ -45,18 +45,19 @@ parser.add_argument("--ckpt", default="/tmp/weights", type=str, help="Checkpoint
 main_args = parser.parse_args()
 
 
-def _report_result(msgkey, resdata):
-    if not _DEBUG_:
+def _report_result(msgkey, resdata, errcode=0):
+    if _RELEASE_:
+        if errcode < 0:
+            resdata['errno'] = errcode
+            resdata['progress'] = 100
         race_report_result(msgkey, resdata)
         race_report_result('zmp_run', f'{main_args.topic}:120')
     else:
         pass
 
 
-def inference(model, opt):
-    msgkey = main_args.topic
-    if 'msgkey' in opt.pigeon:
-        msgkey = opt.pigeon.msgkey
+def inference(model, opt, resdata):
+    msgkey = opt.pigeon.msgkey
     user_code = 'unkown'
     if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
@@ -69,7 +70,7 @@ def inference(model, opt):
     in_threshold = 0.5
     if 'in_threshold' in opt:
         in_threshold = opt.in_threshold
-    strides = [1, 2, 3, 4]
+    strides = [3, 5, 7, 9, 13]
     if 'strides' in opt:
         strides = list(opt.strides)
     constant_speed = False
@@ -81,7 +82,7 @@ def inference(model, opt):
     fully_periodic = False
     if 'fully_periodic' in opt:
         fully_periodic = opt.fully_periodic
-    save_video = True
+    save_video = False
     if 'save_video' in opt:
         save_video = opt.save_video
     rm_still = False
@@ -90,7 +91,7 @@ def inference(model, opt):
     area_rate_thres = 0.002
     if 'area_rate_threshold' in opt:
         area_rate_thres = opt.area_rate_threshold
-    best_stride_video = False
+    best_stride_video = True
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
 
@@ -99,14 +100,25 @@ def inference(model, opt):
     else:
         model_progress_weight = 0.78
 
-    resdata = {'pigeon': dict(opt.pigeon), 'task': main_args.topic, 'errno': 0}
-
-    outdir = os.path.join(main_args.out, user_code)
+    outdir = os.path.join(main_args.out, user_code, 'repnet_tf')
     shutil.rmtree(outdir, ignore_errors=True)
     os.makedirs(outdir, exist_ok=True)
 
-    if not _DEBUG_:
-        race_object_remove(osscli, outdir[1:] + '/', bucket_name='raceai')
+    # parse path info
+    if _RELEASE_:
+        if 'https://' in opt.video and 's3.didiyun' in opt.video:
+            uri = opt.video[8:]
+        else:
+            _report_result(msgkey, resdata, errcode=-10)
+            raise RuntimeError('video url invalid: %s' % opt.video)
+
+        segs = uri.split('/')
+        bucketname = segs[0].split('.')[0]
+        oss_domain = 'https://%s' % segs[0]
+        oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
+    else:
+        oss_domain = 'file://'
+        oss_path = '/tmp/debug/repent_tf'
 
     def _video_read_progress(x):
         resdata['progress'] = x * 0.2
@@ -125,10 +137,18 @@ def inference(model, opt):
 
     resdata['progress'] = 0.0
     _report_result(msgkey, resdata)
-    frames, vid_fps, still_frames = read_video(
-            race_data(opt.video), width=112, height=112, rot=None,
-            progress_cb=_video_read_progress,
-            rm_still=rm_still, area_rate_thres=area_rate_thres)
+    try:
+        frames, vid_fps, still_frames = read_video(
+                race_data(opt.video), width=112, height=112, rot=None,
+                progress_cb=_video_read_progress,
+                rm_still=rm_still, area_rate_thres=area_rate_thres)
+    except:
+        _report_result(msgkey, resdata, errcode=-20)
+        raise RuntimeError('read video error: %s' % opt.video)
+    if len(frames) <= 64:
+        _report_result(msgkey, resdata, errcode=-21)
+        raise RuntimeError('read video error: %s num_frames[%d]' % (opt.video, len(frames)))
+
     _report_result(msgkey, resdata)
 
     s_time = time.time()
@@ -168,7 +188,8 @@ def inference(model, opt):
                 stride_skip_mask[k] = False
             i += 1
         else:
-            raise '%d vs %d vs %d' % (i, j, k)
+            _report_result(msgkey, resdata, errcode=-30)
+            raise RuntimeError('%d vs %d vs %d' % (i, j, k))
     # frames = final_frames
     within_period = final_within_period
     per_frame_counts = np.asarray(final_per_frame_counts)
@@ -199,9 +220,6 @@ def inference(model, opt):
         })
     json_result['frames_period'] = frames_info
 
-    oss_f = os.path.basename(opt.video)
-    oss_d = os.path.dirname(os.path.dirname(opt.video))
-    prefix = os.path.join(oss_d, 'outputs', oss_f.split('.')[0])
     if save_video or best_stride_video:
         cap = cv2.VideoCapture(opt.video)
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -209,14 +227,14 @@ def inference(model, opt):
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fmt = cv2.VideoWriter_fourcc(*'mp4v')
         if save_video:
-            outfile = os.path.join(outdir, 'repnet_tf-target.mp4')
+            outfile = os.path.join(outdir, 'target.mp4')
             vid = cv2.VideoWriter(outfile, fmt, fps, (width, height))
-            resdata['target_mp4'] = os.path.join(prefix, os.path.basename(outfile))
+            resdata['target_mp4'] = oss_domain + os.path.join(oss_path, os.path.basename(outfile))
             json_result['target_mp4'] = resdata['target_mp4']
         if best_stride_video:
-            outfile2 = os.path.join(outdir, 'repnet_tf-target-stride.mp4')
-            stride_vid = cv2.VideoWriter(outfile2, fmt, fps, (width, height))
-            resdata['stride_mp4'] =  os.path.join(prefix, os.path.basename(outfile2))
+            outfile = os.path.join(outdir, 'target-stride.mp4')
+            stride_vid = cv2.VideoWriter(outfile, fmt, fps, (width, height))
+            resdata['stride_mp4'] = oss_domain + os.path.join(oss_path, os.path.basename(outfile))
             json_result['stride_mp4'] = resdata['stride_mp4']
         if cap.isOpened():
             idx = 0
@@ -242,24 +260,26 @@ def inference(model, opt):
         mkvid_time = time.time() - s_time - infer_time
         json_result['mkvideo_time'] = mkvid_time
 
-    json_result_file = os.path.join(outdir, 'repnet_tf-results.json')
+    json_result_file = os.path.join(outdir, 'results.json')
     with open(json_result_file, 'w') as fw:
         fw.write(json.dumps(json_result, indent=4))
 
-    if not _DEBUG_:
-        index = len('https://frepai.s3.didiyunapi.com')
-        prefix_map = [outdir, prefix[index:]]
+    del json_result, frames_info
+
+    if _RELEASE_:
+        race_object_remove(osscli, outdir[1:] + '/', bucket_name=bucketname)
+        prefix_map = [outdir, oss_path]
         Logger.info(prefix_map)
         result = race_object_put(osscli, outdir,
-                bucket_name='frepai', prefix_map=prefix_map)
+                bucket_name=bucketname, prefix_map=prefix_map)
     resdata['progress'] = 100.0
-    resdata['target_json'] = os.path.join(prefix, os.path.basename(json_result_file))
+    resdata['target_json'] = oss_domain + os.path.join(oss_path, os.path.basename(json_result_file))
     Logger.info(json.dumps(resdata))
     _report_result(msgkey, resdata)
 
 
 if __name__ == "__main__":
-    if not _DEBUG_:
+    if _RELEASE_:
         zmqsub.subscribe(main_args.topic)
         race_report_result('add_topic', main_args.topic)
 
@@ -267,7 +287,7 @@ if __name__ == "__main__":
         # Load model
         repnet_model = get_model(main_args.ckpt)
 
-        if not _DEBUG_:
+        if _RELEASE_:
             while True:
                 Logger.info('wait task')
                 race_report_result('zmp_end', main_args.topic)
@@ -278,7 +298,11 @@ if __name__ == "__main__":
                 if 'pigeon' not in zmq_cfg:
                     continue
                 Logger.info(zmq_cfg.pigeon)
-                inference(repnet_model, zmq_cfg)
+                resdata = {'pigeon': dict(zmq_cfg.pigeon), 'task': main_args.topic, 'errno': 0}
+                try:
+                    inference(repnet_model, zmq_cfg, resdata)
+                except:
+                    _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99)
                 time.sleep(0.01)
         else:
             zmq_cfg = {
@@ -289,8 +313,9 @@ if __name__ == "__main__":
             # "video": "https://raceai.s3.didiyunapi.com/data/media/videos/repnet_test.mp4"
             zmq_cfg = OmegaConf.create(zmq_cfg)
             Logger.info(zmq_cfg)
+            resdata = {'pigeon': zmq_cfg['pigeon'], 'task': main_args.topic, 'errno': 0}
             inference(repnet_model, zmq_cfg)
     finally:
-        if _DEBUG_:
+        if _RELEASE_:
             race_report_result('del_topic', main_args.topic)
         Logger.info('end')
