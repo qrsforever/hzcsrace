@@ -9,7 +9,9 @@ import tempfile
 import multiprocessing
 import requests
 import errno
+# import GPUtil
 
+# from torch.cuda import max_memory_allocated
 from urllib import request, parse
 from omegaconf.dictconfig import DictConfig
 from contextlib import contextmanager
@@ -17,6 +19,17 @@ from raceai.utils.error import errmsg
 
 DEBUG = False
 TEMPDIR = '/tmp/'
+
+
+class AssertionError(Exception):
+    """
+    Args:
+        errcode: int
+        errtext: str
+    """
+    def __init__(self, errcode, errtext=''):
+        self.errcode = errcode
+        self.errtext = errtext
 
 
 def race_blockprint(func):
@@ -226,3 +239,10 @@ def race_object_remove(client, remote_path, bucket_name=None):
             'bucket': obj.bucket_name,
             'object': obj.object_name,
             'size': obj.size})
+
+
+# def race_assert_cuda(gno, size_mb):
+#     max_mem = max_memory_allocated(gno)
+#     if size_mb * 1024 * 1024 < max_mem:
+#         assert AssertionError(-201, f'{max_mem} vs {size_mb * 1024 * 1024}')
+#     return max_mem 

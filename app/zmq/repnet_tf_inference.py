@@ -301,7 +301,10 @@ if __name__ == "__main__":
                 resdata = {'pigeon': dict(zmq_cfg.pigeon), 'task': main_args.topic, 'errno': 0}
                 try:
                     inference(repnet_model, zmq_cfg, resdata)
-                except:
+                except Exception as err:
+                    if 'OOM' in str(err):
+                        _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-9)
+                        raise err
                     _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99)
                 time.sleep(0.01)
         else:
@@ -315,6 +318,8 @@ if __name__ == "__main__":
             Logger.info(zmq_cfg)
             resdata = {'pigeon': zmq_cfg['pigeon'], 'task': main_args.topic, 'errno': 0}
             inference(repnet_model, zmq_cfg)
+    except Exception as err: 
+        Logger.error(err)
     finally:
         if _RELEASE_:
             race_report_result('del_topic', main_args.topic)

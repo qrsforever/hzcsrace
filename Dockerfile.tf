@@ -49,7 +49,7 @@ RUN $PIP_INSTALL -U pip && \
         $PIP_INSTALL scikit-build zmq protobuf pyhocon omegaconf && \
         $PIP_INSTALL cython opencv-python==4.3.0.36 opencv-contrib-python \
         scipy==1.5.2 matplotlib tqdm==4.48.2 \
-        Minio
+        Minio GPUtil
 
 SHELL ["/bin/bash"]
 COPY entrypoint.sh /entrypoint.sh
