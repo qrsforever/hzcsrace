@@ -42,11 +42,11 @@ class Base64DataLoader(BaseDataLoader):
         data = cfg.data_source.split(',')
         suffix = 'png'
         if len(data) == 2:
-            if data[0].find('wav'):
+            if data[0].find('wav') > 0:
                 suffix = 'wav'
-            elif data[0].find('flac'):
+            elif data[0].find('flac') > 0:
                 suffix = 'flac'
-        filepath = os.path.join('/tmp', 'b64_%02d.%s' % (time.time() % 99, suffix))
+        filepath = os.path.join('/tmp', 'b64_%02d.%s' % (100 * time.time() % 99, suffix))
         with open(filepath, 'wb') as fout:
             fout.write(base64.b64decode(data[-1]))
         super().__init__(filepath, cfg)
