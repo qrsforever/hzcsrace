@@ -210,8 +210,7 @@ def get_counts(model, frames, strides, batch_size,
     if fully_periodic:
         within_period_threshold = 0.0
 
-    # QRS call this before get_counts
-    # frames = model.preprocess(frames)
+    frames = model.preprocess(frames)
 
     for i, stride in enumerate(strides, 1):
         num_batches = int(np.ceil(seq_len / model.num_frames / stride / batch_size))

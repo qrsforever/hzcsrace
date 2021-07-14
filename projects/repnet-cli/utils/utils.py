@@ -6,7 +6,7 @@ import requests
 import os
 
 
-def read_video(video_filename, width=224, height=224, rot=None, progress_cb=None, rm_still=False, area_rate_thres=0.0025):
+def read_video(video_filename, width=224, height=224, rot=None, focus_box=None, progress_cb=None, rm_still=False, area_rate_thres=0.0025):
     """Read video from file."""
     cap = cv2.VideoCapture(video_filename)
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -14,11 +14,14 @@ def read_video(video_filename, width=224, height=224, rot=None, progress_cb=None
     n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     pbar = tqdm(total=n_frames, desc=f"Getting frames from {video_filename} ...")
 
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     if rm_still: # remove still frames
-        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         pre_frame = None
         area_thres = area_rate_thres * w * h
+    if focus_box is not None:
+        focus_x1, focus_y1 = int(w * focus_box[0]), int(h * focus_box[1])
+        focus_x2, focus_y2 = int(w * focus_box[2]), int(h * focus_box[3])
     frames = []
     still_frames = []
     if cap.isOpened():
@@ -41,6 +44,10 @@ def read_video(video_filename, width=224, height=224, rot=None, progress_cb=None
                             break
                 pre_frame = frame_gray
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+            if focus_box is not None:
+                frame_rgb = frame_rgb[focus_y1:focus_y2, focus_x1:focus_x2, :]
+                # if frame_idx % 400 == 0:
+                #     cv2.imwrite(f'/raceai/data/{frame_idx}.png', frame_rgb)
             frame_rgb = cv2.resize(frame_rgb, (width, height))
             if rot:
                 frame_rgb = cv2.rotate(frame_rgb, rot)

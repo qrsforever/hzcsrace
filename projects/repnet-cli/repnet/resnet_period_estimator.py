@@ -225,10 +225,10 @@ class ResnetPeriodEstimator(tf.keras.models.Model):
         imgs = tf.cast(imgs, tf.float32)
         imgs -= 127.5
         imgs /= 127.5
-        if cropped_box:
+        if cropped_box: # TODO Fail: TF is rubbish
             imgs = tf.image.crop_and_resize(imgs,
-                    boxes=[cropped_box],
-                    box_indices=[0],
+                    boxes=[cropped_box] * imgs.shape[0],
+                    box_indices=[0] * imgs.shape[0],
                     crop_size=(self.image_size, self.image_size))
         else:
             imgs = tf.image.resize(imgs, (self.image_size, self.image_size))

@@ -122,8 +122,10 @@ def inference(model, opt, resdata):
         best_stride_video = opt.best_stride_video
     focus_box = None
     if 'focus_box' in opt:
-        focus_box = [opt.focus_box[1], opt.focus_box[0],
-                opt.focus_box[3], opt.focus_box[2]]
+        if isinstance(opt.focus_box[1], float):
+            focus_box = opt.focus_box
+        else:
+            Logger.warn('error box')
 
     if save_video or best_stride_video:
         model_progress_weight = 0.40
@@ -170,7 +172,7 @@ def inference(model, opt, resdata):
     try:
         frames, vid_fps, still_frames = read_video(
                 race_data(opt.video), width=112, height=112, rot=None,
-                progress_cb=_video_read_progress,
+                focus_box=focus_box, progress_cb=_video_read_progress,
                 rm_still=rm_still, area_rate_thres=area_rate_thres)
     except Exception:
         _report_result(msgkey, resdata, errcode=-20)
@@ -183,9 +185,6 @@ def inference(model, opt, resdata):
 
     s_time = time.time()
 
-    frames = model.preprocess(frames, focus_box)
-    Logger.info(len(frames))
-    Logger.info(frames.shape)
     (pred_period, pred_score,
             within_period, per_frame_counts,
             chosen_stride, final_embs) = get_counts(
@@ -280,10 +279,10 @@ def inference(model, opt, resdata):
                 try:
                     if osd_sims and valid_idx % (chosen_stride * model.num_frames) == 0:
                         osd_blend = draw_osd_sim(embs_sims[osd], osd_size)
-                        osd_blend = cv2.addWeighted(
-                                osd_blend, alpha,
-                                frame_bgr[:osd_size, width - osd_size:, :], 1 - alpha,
-                                0, frame_bgr)
+                        # osd_blend = cv2.addWeighted(
+                        #         osd_blend, alpha,
+                        #         frame_bgr[:osd_size, width - osd_size:, :], 1 - alpha,
+                        #         0, frame_bgr)
                         osd += 1
                     if osd_blend is not None:
                         frame_bgr[:osd_size, width - osd_size:, :] = osd_blend
@@ -291,14 +290,15 @@ def inference(model, opt, resdata):
                     Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
                 cv2.putText(frame_bgr,
-                        'S:%d C:%.3f' % (chosen_stride, sum_counts[idx]),
+                        'W:%d H:%d FPS:%.3f' % (width, height, fps),
                         (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 0, 255), 2)
                 cv2.putText(frame_bgr,
-                        'W:%d H:%d FPS:%.3f' % (width, height, fps),
-                        (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 0, 255), 2)
+                        'S:%d C:%.3f' % (chosen_stride, sum_counts[idx]),
+                        (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 0, 255), 2)
                 if focus_box is not None:
                     cv2.rectangle(frame_bgr,
-                            (focus_box[0], focus_box[1]), (focus_box[2], focus_box[3]),
+                            (int(width * focus_box[0]), int(height * focus_box[1])),
+                            (int(width * focus_box[2]), int(height * focus_box[3])),
                             (200, 0, 0, 255), 2)
                     pass
                 if save_video:
