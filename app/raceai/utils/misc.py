@@ -9,9 +9,7 @@ import tempfile
 import multiprocessing
 import requests
 import errno
-# import GPUtil
 
-# from torch.cuda import max_memory_allocated
 from urllib import request, parse
 from omegaconf.dictconfig import DictConfig
 from contextlib import contextmanager
@@ -171,17 +169,21 @@ def race_object_put(client, local_path,
         file_size = os.stat(local_file).st_size
         if local_file.endswith('.json'):
             content_type = 'text/json'
-        elif local_file.endswith('.csv'): 
+        elif local_file.endswith('.csv'):
             content_type = 'text/csv'
-        elif local_file.endswith('.mp4'): 
+        elif local_file.endswith('.mp4'):
             content_type = 'video/mp4'
-        elif local_file.endswith('.avi'): 
+        elif local_file.endswith('.avi'):
             content_type = 'video/avi'
+        else:
+            content_type = 'application/octet-stream'
         with open(local_file, 'rb') as file_data:
             btime = time.time()
             etag = client.put_object(bucket_name,
                     remote_file, file_data, file_size,
                     content_type=content_type, metadata=metadata)
+            if not isinstance(etag, str):
+                etag = etag.etag
             etime = time.time()
             result.append({'etag': etag,
                 'bucket': bucket_name,
@@ -239,10 +241,3 @@ def race_object_remove(client, remote_path, bucket_name=None):
             'bucket': obj.bucket_name,
             'object': obj.object_name,
             'size': obj.size})
-
-
-# def race_assert_cuda(gno, size_mb):
-#     max_mem = max_memory_allocated(gno)
-#     if size_mb * 1024 * 1024 < max_mem:
-#         assert AssertionError(-201, f'{max_mem} vs {size_mb * 1024 * 1024}')
-#     return max_mem 

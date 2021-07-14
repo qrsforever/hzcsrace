@@ -21,7 +21,7 @@ def pairwise_l2_distance(a, b):
     return dist
 
 
-def get_sims(embs, temperature):
+def get_sims(embs, temperature=13.544):
     """Calculates self-similarity between batch of sequence of embeddings."""
     batch_size = tf.shape(embs)[0]
     seq_len = tf.shape(embs)[1]
@@ -221,9 +221,15 @@ class ResnetPeriodEstimator(tf.keras.models.Model):
         return x, within_period_x, final_embs
 
     @tf.function
-    def preprocess(self, imgs):
+    def preprocess(self, imgs, cropped_box=None):
         imgs = tf.cast(imgs, tf.float32)
         imgs -= 127.5
         imgs /= 127.5
-        imgs = tf.image.resize(imgs, (self.image_size, self.image_size))
+        if cropped_box:
+            imgs = tf.image.crop_and_resize(imgs,
+                    boxes=[cropped_box],
+                    box_indices=[0],
+                    crop_size=(self.image_size, self.image_size))
+        else:
+            imgs = tf.image.resize(imgs, (self.image_size, self.image_size))
         return imgs

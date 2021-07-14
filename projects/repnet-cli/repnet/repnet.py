@@ -28,11 +28,10 @@ def get_repnet_model(logdir):
     for gpu in gpus:
         # tf.config.experimental.set_memory_growth(gpu, True)
         # or
-        print('Limit fix memory: 10240')
+        print('Limit fix memory: 15120')
         tf.config.experimental.set_virtual_device_configuration(
                 gpu,
-                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=10240)]
-                )
+                [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=15120)])
 
     # Define RepNet model.
     model = ResnetPeriodEstimator()
@@ -205,32 +204,36 @@ def get_counts(model, frames, strides, batch_size,
     seq_len = len(frames)
     raw_scores_list = []
     scores = []
+    embs_list = []
     within_period_scores_list = []
 
     if fully_periodic:
         within_period_threshold = 0.0
 
-    frames = model.preprocess(frames)
+    # QRS call this before get_counts
+    # frames = model.preprocess(frames)
 
     for i, stride in enumerate(strides, 1):
         num_batches = int(np.ceil(seq_len / model.num_frames / stride / batch_size))
         raw_scores_per_stride = []
         within_period_score_stride = []
+        embs_stride = []
         for batch_idx in range(num_batches):
-            idxes = tf.range(batch_idx * model.num_frames * stride,
-                             (batch_idx + batch_size) * model.num_frames * stride,
-                             stride)
+            idxes = tf.range(batch_idx * batch_size * model.num_frames * stride,
+                    (batch_idx + 1) * batch_size * model.num_frames * stride,
+                    stride)
             idxes = tf.clip_by_value(idxes, 0, seq_len - 1)
             curr_frames = tf.gather(frames, idxes)
             curr_frames = tf.reshape(
                 curr_frames,
                 [batch_size, model.num_frames, model.image_size, model.image_size, 3])
 
-            raw_scores, within_period_scores, _ = model(curr_frames)
+            raw_scores, within_period_scores, embs = model(curr_frames)
             raw_scores_per_stride.append(np.reshape(raw_scores.numpy(),
                                                     [-1, model.num_frames // 2]))
             within_period_score_stride.append(np.reshape(within_period_scores.numpy(),
                                                          [-1, 1]))
+            embs_stride.append(embs)
         if progress_cb:
             progress_cb(round((100 * float(i)) / len(strides), 2))
         raw_scores_per_stride = np.concatenate(raw_scores_per_stride, axis=0)
@@ -241,6 +244,7 @@ def get_counts(model, frames, strides, batch_size,
             raw_scores_per_stride, within_period_score_stride)
         scores.append(pred_score)
         within_period_scores_list.append(within_period_score_stride)
+        embs_list.append(np.concatenate(embs_stride, axis=0))
 
     # Stride chooser
     argmax_strides = np.argmax(scores)
@@ -253,6 +257,8 @@ def get_counts(model, frames, strides, batch_size,
     within_period_binary = np.asarray(within_period > within_period_threshold)
     if median_filter:
         within_period_binary = medfilt(within_period_binary, 5)
+
+    final_embs = embs_list[argmax_strides]
 
     # Select Periodic frames
     periodic_idxes = np.where(within_period_binary)[0]
@@ -290,7 +296,7 @@ def get_counts(model, frames, strides, batch_size,
         else:
             pred_period = seq_len * 0.0
 
-    del frames
+    del frames, scores, within_period_scores_list, embs_list
 
     if pred_score < threshold:
         print('No repetitions detected in video as score '
@@ -298,7 +304,7 @@ def get_counts(model, frames, strides, batch_size,
         per_frame_counts = np.asarray(len(per_frame_counts) * [0.])
 
     return (pred_period, pred_score, within_period,
-            per_frame_counts, chosen_stride)
+            per_frame_counts, chosen_stride, final_embs)
 
 
 def get_score(period_score, within_period_score):
