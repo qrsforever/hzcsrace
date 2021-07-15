@@ -234,7 +234,7 @@ def get_counts(model, frames, strides, batch_size,
                                                          [-1, 1]))
             embs_stride.append(embs)
         if progress_cb:
-            progress_cb(round((100 * float(i)) / len(strides), 2))
+            progress_cb((100 * float(i)) / len(strides))
         raw_scores_per_stride = np.concatenate(raw_scores_per_stride, axis=0)
         raw_scores_list.append(raw_scores_per_stride)
         within_period_score_stride = np.concatenate(

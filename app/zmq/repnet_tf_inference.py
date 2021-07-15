@@ -117,7 +117,7 @@ def inference(model, opt, resdata):
     area_rate_thres = 0.002
     if 'area_rate_threshold' in opt:
         area_rate_thres = opt.area_rate_threshold
-    best_stride_video = True
+    best_stride_video = False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
     focus_box = None
@@ -125,45 +125,59 @@ def inference(model, opt, resdata):
         if isinstance(opt.focus_box[1], float):
             focus_box = opt.focus_box
         else:
-            Logger.warn('error box')
+            Logger.warning(f'error box: {opt.focus_box}')
+    block_box = None
+    if 'block_box' in opt:
+        if isinstance(opt.block_box[1], float):
+            block_box = opt.block_box
+        else:
+            Logger.warning('error box: {opt.block_box')
 
     if save_video or best_stride_video:
         model_progress_weight = 0.40
     else:
         model_progress_weight = 0.78
 
-    outdir = os.path.join(main_args.out, user_code, 'repnet_tf')
+    if user_code == 'notebook':
+        ts_token = '%d' % time.time()
+    else:
+        ts_token = 'repnet_tf'
+    outdir = os.path.join(main_args.out, user_code, ts_token)
     shutil.rmtree(outdir, ignore_errors=True)
     os.makedirs(outdir, exist_ok=True)
 
     # parse path info
     if _RELEASE_:
-        if 'https://' in opt.video and 's3.didiyun' in opt.video:
+        if 'https://' in opt.video and 'didiyunapi.com' in opt.video:
             uri = opt.video[8:]
         else:
             _report_result(msgkey, resdata, errcode=-10)
-            raise RuntimeError('video url invalid: %s' % opt.video)
+            Logger.warning('video url invalid: %s' % opt.video)
+            return
+        video_file = race_data(opt.video.replace('s3.didiyunapi', 's3-internal.didiyunapi'))
 
         segs = uri.split('/')
         bucketname = segs[0].split('.')[0]
         oss_domain = 'https://%s' % segs[0]
+        if 's3-internal' in oss_domain:
+            oss_domain = oss_domain.replace('s3-internal', 's3')
         oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
     else:
         oss_domain = 'file://'
         oss_path = '/tmp/debug/repent_tf'
+        video_file = opt.video
 
     def _video_read_progress(x):
-        resdata['progress'] = x * 0.2
-        # Logger.info(resdata['progress'])
+        resdata['progress'] = round(x * 0.2, 2)
         _report_result(msgkey, resdata)
 
     def _model_strides_progress(x):
-        resdata['progress'] = 20 + x * model_progress_weight
+        resdata['progress'] = round(20 + x * model_progress_weight, 2)
         Logger.info(resdata['progress'])
         _report_result(msgkey, resdata)
 
     def _video_save_progress(x):
-        resdata['progress'] = 60 + x * 0.30
+        resdata['progress'] = round(60 + x * 0.4, 2)
         Logger.info(resdata['progress'])
         _report_result(msgkey, resdata)
 
@@ -171,15 +185,19 @@ def inference(model, opt, resdata):
     _report_result(msgkey, resdata)
     try:
         frames, vid_fps, still_frames = read_video(
-                race_data(opt.video), width=112, height=112, rot=None,
-                focus_box=focus_box, progress_cb=_video_read_progress,
+                video_file, width=112, height=112, rot=None,
+                block_box=block_box, focus_box=focus_box,
+                progress_cb=_video_read_progress,
                 rm_still=rm_still, area_rate_thres=area_rate_thres)
     except Exception:
         _report_result(msgkey, resdata, errcode=-20)
-        raise RuntimeError('read video error: %s' % opt.video)
+        Logger.warning('read video error: %s' % opt.video)
+        Logger.error(traceback.format_exc(limit=3))
+        return
     if len(frames) <= 64:
         _report_result(msgkey, resdata, errcode=-21)
-        raise RuntimeError('read video error: %s num_frames[%d]' % (opt.video, len(frames)))
+        Logger.warning('read video error: %s num_frames[%d]' % (opt.video, len(frames)))
+        return
 
     _report_result(msgkey, resdata)
 
@@ -199,7 +217,7 @@ def inference(model, opt, resdata):
             fully_periodic=fully_periodic,
             progress_cb=_model_strides_progress)
     infer_time = time.time() - s_time
-    Logger.info('model inference using time: %d' % infer_time)
+    Logger.info('model inference using time: %d, chosen_stride:%d' % (infer_time, chosen_stride))
 
     all_frames_count = len(frames) + len(still_frames)
     is_still_frames = [False] * all_frames_count
@@ -217,7 +235,9 @@ def inference(model, opt, resdata):
             i += 1
         else:
             _report_result(msgkey, resdata, errcode=-30)
-            raise RuntimeError('%d vs %d vs %d' % (i, j, k))
+            Logger.warning('frames count invalid: %d vs %d vs %d' % (i, j, k))
+            return
+
     within_period = final_within_period
     per_frame_counts = np.asarray(final_per_frame_counts)
     sum_counts = np.cumsum(per_frame_counts)
@@ -243,7 +263,7 @@ def inference(model, opt, resdata):
             'is_still': is_still,
             'within_period': float(in_period),
             'pframe_counts': float(p_count),
-            'cum_counts': sum_counts[i]
+            'cum_counts': float(sum_counts[i])
         })
     json_result['frames_period'] = frames_info
 
@@ -255,7 +275,7 @@ def inference(model, opt, resdata):
     del within_period, per_frame_counts, final_embs
 
     if save_video or best_stride_video:
-        cap = cv2.VideoCapture(opt.video)
+        cap = cv2.VideoCapture(video_file)
         fps = cap.get(cv2.CAP_PROP_FPS)
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -277,7 +297,9 @@ def inference(model, opt, resdata):
                 if not success:
                     break
                 try:
-                    if osd_sims and valid_idx % (chosen_stride * model.num_frames) == 0:
+                    if osd_sims and not is_still_frames[idx] \
+                            and valid_idx % (chosen_stride * model.num_frames) == 0:
+                        Logger.info(f'valid_idx: {valid_idx} idx: {idx} osd: {osd}')
                         osd_blend = draw_osd_sim(embs_sims[osd], osd_size)
                         # osd_blend = cv2.addWeighted(
                         #         osd_blend, alpha,
@@ -290,56 +312,68 @@ def inference(model, opt, resdata):
                     Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
                 cv2.putText(frame_bgr,
-                        'W:%d H:%d FPS:%.3f' % (width, height, fps),
-                        (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 0, 255), 2)
-                cv2.putText(frame_bgr,
-                        'S:%d C:%.3f' % (chosen_stride, sum_counts[idx]),
-                        (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 0, 0, 255), 2)
+                        'W:%d H:%d F:%.1f S:%d C:%.1f/%.1f %s' % (width, height,
+                            fps, chosen_stride, sum_counts[idx], sum_counts[-1],
+                            'STILL' if is_still_frames[idx] else ''),
+                        (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 255, 0, 0), 2)
+                if block_box is not None:
+                    cv2.rectangle(frame_bgr,
+                            (int(width * block_box[0]), int(height * block_box[1])),
+                            (int(width * block_box[2]), int(height * block_box[3])),
+                            (200, 0, 255, 0), 2)
                 if focus_box is not None:
                     cv2.rectangle(frame_bgr,
                             (int(width * focus_box[0]), int(height * focus_box[1])),
                             (int(width * focus_box[2]), int(height * focus_box[3])),
                             (200, 0, 0, 255), 2)
-                    pass
+                if idx % 100 == 0:
+                    _video_save_progress((90 * float(idx)) / all_frames_count)
+
                 if save_video:
                     vid.write(frame_bgr)
-                if best_stride_video and valid_idx % chosen_stride == 0:
+                if best_stride_video and not is_still_frames[idx] \
+                        and valid_idx % chosen_stride == 0:
                     stride_vid.write(frame_bgr)
-                if idx % 100 == 0:
-                    _video_save_progress(round((100 * float(idx)) / all_frames_count, 2))
                 if not is_still_frames[idx]:
                     valid_idx += 1
                 idx += 1
         cap.release()
+        _video_save_progress(91)
         if save_video:
             vid.release()
             os.system(f'ffmpeg -an -i {mp4v_file} {ffmpeg_args} {h264_file} 2>/dev/null')
             os.remove(mp4v_file)
             resdata['target_mp4'] = oss_domain + os.path.join(oss_path, os.path.basename(h264_file))
             json_result['target_mp4'] = resdata['target_mp4']
+        _video_save_progress(94)
         if best_stride_video:
             stride_vid.release()
             os.system(f'ffmpeg -an -i {mp4v_stride_file} {ffmpeg_args} {h264_stride_file} 2>/dev/null')
             os.remove(mp4v_stride_file)
             resdata['stride_mp4'] = oss_domain + os.path.join(oss_path, os.path.basename(h264_stride_file))
             json_result['stride_mp4'] = resdata['stride_mp4']
+        _video_save_progress(96)
         if osd_sims:
             np.save(os.path.join(outdir, 'embs_sims.npy'), embs_sims)
         mkvid_time = time.time() - s_time - infer_time
         json_result['mkvideo_time'] = mkvid_time
 
+    _video_save_progress(98)
     json_result_file = os.path.join(outdir, 'results.json')
     with open(json_result_file, 'w') as fw:
         fw.write(json.dumps(json_result, indent=4))
 
-    del json_result, frames_info, embs_sims
+    del json_result, frames_info
+    if osd_sims:
+        del embs_sims
+    os.remove(video_file)
 
     if _RELEASE_:
         race_object_remove(osscli, outdir[1:] + '/', bucket_name=bucketname)
         prefix_map = [outdir, oss_path]
-        result = race_object_put(osscli, outdir,
+        race_object_put(osscli, outdir,
                 bucket_name=bucketname, prefix_map=prefix_map)
-        Logger.info(result)
+    _video_save_progress(100)
     resdata['progress'] = 100.0
     resdata['target_json'] = oss_domain + os.path.join(oss_path, os.path.basename(json_result_file))
     Logger.info(json.dumps(resdata))
@@ -352,6 +386,9 @@ if __name__ == "__main__":
     if _RELEASE_:
         zmqsub.subscribe(main_args.topic)
         race_report_result('add_topic', main_args.topic)
+
+    os.system('rm /tmp/*.mp4 2>/dev/null')
+    os.system('rm /tmp/tmp*.py 2>/dev/null')
 
     try:
         # Load model
@@ -375,7 +412,6 @@ if __name__ == "__main__":
                     if 'OOM' in str(err):
                         _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-9)
                         raise err
-                    Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
                     _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99)
                 time.sleep(0.01)

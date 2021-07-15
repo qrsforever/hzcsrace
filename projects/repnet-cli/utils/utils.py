@@ -5,8 +5,13 @@ import numpy as np
 import requests
 import os
 
+DEBUG = False
 
-def read_video(video_filename, width=224, height=224, rot=None, focus_box=None, progress_cb=None, rm_still=False, area_rate_thres=0.0025):
+
+def read_video(
+        video_filename, width=224, height=224,
+        rot=None, block_box=None, focus_box=None,
+        progress_cb=None, rm_still=False, area_rate_thres=0.0025):
     """Read video from file."""
     cap = cv2.VideoCapture(video_filename)
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -19,11 +24,20 @@ def read_video(video_filename, width=224, height=224, rot=None, focus_box=None, 
     if rm_still: # remove still frames
         pre_frame = None
         area_thres = area_rate_thres * w * h
+    if block_box is not None:
+        block_x1, block_y1 = int(w * block_box[0]), int(h * block_box[1])
+        block_x2, block_y2 = int(w * block_box[2]), int(h * block_box[3])
     if focus_box is not None:
         focus_x1, focus_y1 = int(w * focus_box[0]), int(h * focus_box[1])
         focus_x2, focus_y2 = int(w * focus_box[2]), int(h * focus_box[3])
+        w = focus_x2 - focus_x1
+        h = focus_y2 - focus_y1
     frames = []
     still_frames = []
+
+    if DEBUG:
+        debug_file = os.path.join('/raceai/data', 'debug_file.mp4')
+        debug_vid = cv2.VideoWriter(debug_file, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
     if cap.isOpened():
         frame_idx = 0
         while True:
@@ -31,6 +45,10 @@ def read_video(video_filename, width=224, height=224, rot=None, focus_box=None, 
             if not success:
                 break
             keep_flag = False
+            if block_box is not None:
+                frame_bgr[block_y1:block_y2, block_x1:block_x2, :] = 0
+            if focus_box is not None:
+                frame_bgr = frame_bgr[focus_y1:focus_y2, focus_x1:focus_x2, :]
             if rm_still:
                 frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
                 if pre_frame is not None:
@@ -43,11 +61,8 @@ def read_video(video_filename, width=224, height=224, rot=None, focus_box=None, 
                             keep_flag = True
                             break
                 pre_frame = frame_gray
+
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-            if focus_box is not None:
-                frame_rgb = frame_rgb[focus_y1:focus_y2, focus_x1:focus_x2, :]
-                # if frame_idx % 400 == 0:
-                #     cv2.imwrite(f'/raceai/data/{frame_idx}.png', frame_rgb)
             frame_rgb = cv2.resize(frame_rgb, (width, height))
             if rot:
                 frame_rgb = cv2.rotate(frame_rgb, rot)
@@ -55,14 +70,21 @@ def read_video(video_filename, width=224, height=224, rot=None, focus_box=None, 
                 still_frames.append((frame_idx, frame_rgb))
             else:
                 frames.append(frame_rgb)
+                if DEBUG:
+                    debug_vid.write(frame_bgr)
+
             frame_idx += 1
 
             if progress_cb:
                 if frame_idx % 100 == 0:
-                    progress_cb(round((100 * float(frame_idx)) / n_frames, 2))
+                    progress_cb((100 * float(frame_idx)) / n_frames)
+
+            del frame_bgr
 
             pbar.update()
     pbar.close()
+    if DEBUG:
+        debug_vid.release()
     print(n_frames, 'vs', len(frames))
     # if rm_still:
     #     fps = len(frames) * fps / n_frames
