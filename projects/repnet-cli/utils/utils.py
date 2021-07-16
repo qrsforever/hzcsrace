@@ -10,7 +10,7 @@ DEBUG = False
 
 def read_video(
         video_filename, width=224, height=224,
-        rot=None, block_box=None, focus_box=None,
+        rot=None, black_box=None, focus_box=None,
         progress_cb=None, rm_still=False, area_rate_thres=0.0025):
     """Read video from file."""
     cap = cv2.VideoCapture(video_filename)
@@ -24,9 +24,9 @@ def read_video(
     if rm_still: # remove still frames
         pre_frame = None
         area_thres = area_rate_thres * w * h
-    if block_box is not None:
-        block_x1, block_y1 = int(w * block_box[0]), int(h * block_box[1])
-        block_x2, block_y2 = int(w * block_box[2]), int(h * block_box[3])
+    if black_box is not None:
+        black_x1, black_y1 = int(w * black_box[0]), int(h * black_box[1])
+        black_x2, black_y2 = int(w * black_box[2]), int(h * black_box[3])
     if focus_box is not None:
         focus_x1, focus_y1 = int(w * focus_box[0]), int(h * focus_box[1])
         focus_x2, focus_y2 = int(w * focus_box[2]), int(h * focus_box[3])
@@ -45,8 +45,8 @@ def read_video(
             if not success:
                 break
             keep_flag = False
-            if block_box is not None:
-                frame_bgr[block_y1:block_y2, block_x1:block_x2, :] = 0
+            if black_box is not None:
+                frame_bgr[black_y1:black_y2, black_x1:black_x2, :] = 0
             if focus_box is not None:
                 frame_bgr = frame_bgr[focus_y1:focus_y2, focus_x1:focus_x2, :]
             if rm_still:

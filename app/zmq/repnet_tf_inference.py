@@ -122,16 +122,18 @@ def inference(model, opt, resdata):
         best_stride_video = opt.best_stride_video
     focus_box = None
     if 'focus_box' in opt:
-        if isinstance(opt.focus_box[1], float):
-            focus_box = opt.focus_box
-        else:
+        if 0 == opt.focus_box[0] and 0 == opt.focus_box[1] \
+                and 1 == opt.focus_box[2] and 1 == opt.focus_box[3]:
             Logger.warning(f'error box: {opt.focus_box}')
-    block_box = None
-    if 'block_box' in opt:
-        if isinstance(opt.block_box[1], float):
-            block_box = opt.block_box
         else:
-            Logger.warning('error box: {opt.block_box')
+            focus_box = opt.focus_box
+    black_box = None
+    if 'black_box' in opt:
+        if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
+                and 0 == opt.black_box[2] and 0 == opt.black_box[3]:
+            Logger.warning('error black box: {opt.black_box')
+        else:
+            black_box = opt.black_box
 
     if save_video or best_stride_video:
         model_progress_weight = 0.40
@@ -186,7 +188,7 @@ def inference(model, opt, resdata):
     try:
         frames, vid_fps, still_frames = read_video(
                 video_file, width=112, height=112, rot=None,
-                block_box=block_box, focus_box=focus_box,
+                black_box=black_box, focus_box=focus_box,
                 progress_cb=_video_read_progress,
                 rm_still=rm_still, area_rate_thres=area_rate_thres)
     except Exception:
@@ -316,10 +318,10 @@ def inference(model, opt, resdata):
                             fps, chosen_stride, sum_counts[idx], sum_counts[-1],
                             'STILL' if is_still_frames[idx] else ''),
                         (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 255, 0, 0), 2)
-                if block_box is not None:
+                if black_box is not None:
                     cv2.rectangle(frame_bgr,
-                            (int(width * block_box[0]), int(height * block_box[1])),
-                            (int(width * block_box[2]), int(height * block_box[3])),
+                            (int(width * black_box[0]), int(height * black_box[1])),
+                            (int(width * black_box[2]), int(height * black_box[3])),
                             (200, 0, 255, 0), 2)
                 if focus_box is not None:
                     cv2.rectangle(frame_bgr,
