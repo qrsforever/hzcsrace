@@ -199,6 +199,7 @@ def inference(model, opt, resdata):
     if len(frames) <= 64:
         _report_result(msgkey, resdata, errcode=-21)
         Logger.warning('read video error: %s num_frames[%d]' % (opt.video, len(frames)))
+        os.remove(video_file)
         return
 
     _report_result(msgkey, resdata)
@@ -238,6 +239,7 @@ def inference(model, opt, resdata):
         else:
             _report_result(msgkey, resdata, errcode=-30)
             Logger.warning('frames count invalid: %d vs %d vs %d' % (i, j, k))
+            os.remove(video_file)
             return
 
     within_period = final_within_period
@@ -416,6 +418,8 @@ if __name__ == "__main__":
                         raise err
                     Logger.error(traceback.format_exc(limit=3))
                     _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99)
+                    os.system('rm /tmp/*.mp4 2>/dev/null')
+                    os.system('rm /tmp/tmp*.py 2>/dev/null')
                 time.sleep(0.01)
         else:
             zmq_cfg = {
