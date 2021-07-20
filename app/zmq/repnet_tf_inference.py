@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import io
 
 from matplotlib.colors import LogNorm
-from utils import get_model, read_video
+from utils import get_model, read_video, cal_rect_points
 from repnet import get_counts, get_sims
 
 from omegaconf import OmegaConf
@@ -84,6 +84,9 @@ def inference(model, opt, resdata):
     user_code = 'unkown'
     if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
+    eta = 1.0
+    if 'eta' in opt:
+        eta = opt.eta
     batch_size = 20
     if 'batch_size' in opt:
         batch_size = opt.batch_size
@@ -127,13 +130,15 @@ def inference(model, opt, resdata):
             Logger.warning(f'error box: {opt.focus_box}')
         else:
             focus_box = opt.focus_box
-    black_box = None
+    black_box, black_overlay = None, False
     if 'black_box' in opt:
         if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
                 and 0 == opt.black_box[2] and 0 == opt.black_box[3]:
             Logger.warning('error black box: {opt.black_box')
         else:
             black_box = opt.black_box
+        if 'black_overlay' in opt:
+            black_overlay = opt['black_overlay']
 
     if save_video or best_stride_video:
         model_progress_weight = 0.40
@@ -163,7 +168,10 @@ def inference(model, opt, resdata):
         oss_domain = 'https://%s' % segs[0]
         if 's3-internal' in oss_domain:
             oss_domain = oss_domain.replace('s3-internal', 's3')
-        oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
+        if user_code == 'notebook':
+            oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], ts_token)
+        else:
+            oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
     else:
         oss_domain = 'file://'
         oss_path = '/tmp/debug/repent_tf'
@@ -253,6 +261,7 @@ def inference(model, opt, resdata):
     json_result['score'] = np.float(pred_score.numpy())
     json_result['stride'] = chosen_stride
     json_result['fps'] = vid_fps
+    json_result['eta'] = eta
     json_result['num_frames'] = all_frames_count
     if rm_still:
         json_result['num_still_frames'] = len(still_frames)
@@ -292,14 +301,25 @@ def inference(model, opt, resdata):
             mp4v_stride_file = os.path.join(outdir, 'tmp-target-stride.mp4')
             h264_stride_file = os.path.join(outdir, 'target-stride.mp4')
             stride_vid = cv2.VideoWriter(mp4v_stride_file, fmt, fps, (width, height))
+
+        if black_box is not None:
+            bx1, by1, bx2, by2 = cal_rect_points(width, height, black_box) 
+        if focus_box is not None:
+            fx1, fy1, fx2, fy2 = cal_rect_points(width, height, focus_box) 
         if cap.isOpened():
             idx, valid_idx = 0, 0
-            osd, osd_size, alpha = 0, 128, 0.8 # noqa
+            osd, osd_size, alpha = 0, int(width*0.25), 0.8 # noqa
             osd_blend = None
             while True:
                 success, frame_bgr = cap.read()
                 if not success:
                     break
+                if black_box is not None:
+                    if black_overlay:
+                        frame_bgr[by1:by2, bx1:bx2, :] = 0
+                    else:
+                        cv2.rectangle(frame_bgr, (bx1, by1), (bx2, by2), (0, 0, 0), 2)
+                cv2.rectangle(frame_bgr, (0, 0), (width, int(0.08 * height)), (0, 0, 0), -1)
                 try:
                     if osd_sims and not is_still_frames[idx] \
                             and valid_idx % (chosen_stride * model.num_frames) == 0:
@@ -316,20 +336,15 @@ def inference(model, opt, resdata):
                     Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
                 cv2.putText(frame_bgr,
-                        'W:%d H:%d F:%.1f S:%d C:%.1f/%.1f %s' % (width, height,
-                            fps, chosen_stride, sum_counts[idx], sum_counts[-1],
+                        '%dX%d F:%.1f S:%d E:%.1f C:%.1f/%.1f %s' % (width, height,
+                            fps, chosen_stride, eta, sum_counts[idx], sum_counts[-1],
                             'STILL' if is_still_frames[idx] else ''),
-                        (5, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (200, 255, 0, 0), 2)
-                if black_box is not None:
-                    cv2.rectangle(frame_bgr,
-                            (int(width * black_box[0]), int(height * black_box[1])),
-                            (int(width * black_box[2]), int(height * black_box[3])),
-                            (200, 0, 255, 0), 2)
+                        (2, int(0.06 * height)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7 if height < 500 else 2,
+                        (255, 255, 255), 2)
                 if focus_box is not None:
-                    cv2.rectangle(frame_bgr,
-                            (int(width * focus_box[0]), int(height * focus_box[1])),
-                            (int(width * focus_box[2]), int(height * focus_box[3])),
-                            (200, 0, 0, 255), 2)
+                    cv2.rectangle(frame_bgr, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
                 if idx % 100 == 0:
                     _video_save_progress((90 * float(idx)) / all_frames_count)
 

@@ -8,6 +8,16 @@ import os
 DEBUG = False
 
 
+def cal_rect_points(w, h, box):
+    if box[0] < 1.0 and box[1] < 1.0 and box[2] <= 1.0 and box[3] <= 1.0:
+        x1, y1 = int(w * box[0]), int(h * box[1])
+        x2, y2 = int(w * box[2]), int(h * box[3])
+    else:
+        x1, y1 = box[0], box[1]
+        x2, y2 = box[2], box[3]
+    return x1, y1, x2, y2
+
+
 def read_video(
         video_filename, width=224, height=224,
         rot=None, black_box=None, focus_box=None,
@@ -25,11 +35,9 @@ def read_video(
         pre_frame = None
         area_thres = area_rate_thres * w * h
     if black_box is not None:
-        black_x1, black_y1 = int(w * black_box[0]), int(h * black_box[1])
-        black_x2, black_y2 = int(w * black_box[2]), int(h * black_box[3])
+        black_x1, black_y1, black_x2, black_y2 = cal_rect_points(w, h, black_box)
     if focus_box is not None:
-        focus_x1, focus_y1 = int(w * focus_box[0]), int(h * focus_box[1])
-        focus_x2, focus_y2 = int(w * focus_box[2]), int(h * focus_box[3])
+        focus_x1, focus_y1, focus_x2, focus_y2 = cal_rect_points(w, h, focus_box)
         w = focus_x2 - focus_x1
         h = focus_y2 - focus_y1
     frames = []
