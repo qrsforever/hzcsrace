@@ -96,7 +96,7 @@ def inference(model, opt, resdata):
     in_threshold = 0.5
     if 'in_threshold' in opt:
         in_threshold = opt.in_threshold
-    strides = [3, 5, 9, 13]
+    strides = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21]
     if 'strides' in opt:
         strides = list(opt.strides)
     constant_speed = False
@@ -336,8 +336,8 @@ def inference(model, opt, resdata):
                     Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
                 cv2.putText(frame_bgr,
-                        '%dX%d F:%.1f S:%d E:%.1f C:%.1f/%.1f %s' % (width, height,
-                            fps, chosen_stride, eta, sum_counts[idx], sum_counts[-1],
+                        '%dX%d F:%.1f S:%d C:%.1f/%.1f %s' % (width, height,
+                            fps, chosen_stride, sum_counts[idx], sum_counts[-1],
                             'STILL' if is_still_frames[idx] else ''),
                         (2, int(0.06 * height)),
                         cv2.FONT_HERSHEY_SIMPLEX,
@@ -376,8 +376,8 @@ def inference(model, opt, resdata):
             np.save(os.path.join(outdir, 'embs_sims.npy'), embs_sims)
         mkvid_time = time.time() - s_time - infer_time
         json_result['mkvideo_time'] = mkvid_time
+        _video_save_progress(98)
 
-    _video_save_progress(98)
     json_result_file = os.path.join(outdir, 'results.json')
     with open(json_result_file, 'w') as fw:
         fw.write(json.dumps(json_result, indent=4))
