@@ -57,7 +57,7 @@ def _report_result(msgkey, resdata, errcode=0):
             resdata['errno'] = errcode
             resdata['progress'] = 100
         race_report_result(msgkey, resdata)
-        race_report_result('zmp_run', f'{main_args.topic}:120')
+        race_report_result('zmp_run', f'{main_args.topic}:220')
     else:
         pass
 
@@ -117,7 +117,7 @@ def inference(model, opt, resdata):
     osd_sims = False
     if 'osd_sims' in opt:
         osd_sims = opt.osd_sims
-    area_rate_thres = 0.002
+    area_rate_thres = 0.003
     if 'area_rate_threshold' in opt:
         area_rate_thres = opt.area_rate_threshold
     best_stride_video = False
@@ -130,6 +130,15 @@ def inference(model, opt, resdata):
             Logger.warning(f'error box: {opt.focus_box}')
         else:
             focus_box = opt.focus_box
+    else:
+        if 'center_rate' in opt:
+            w_rate, h_rate = opt.center_rate
+            if w_rate != 0 and h_rate != 0:
+                focus_box = [
+                    (1 - w_rate) * 0.5, (1 - h_rate) * 0.5,
+                    (1 + w_rate) * 0.5, (1 + h_rate) * 0.5,
+                ]
+
     black_box, black_overlay = None, False
     if 'black_box' in opt:
         if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
@@ -336,9 +345,9 @@ def inference(model, opt, resdata):
                     Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
                 cv2.putText(frame_bgr,
-                        '%dX%d %.1f S:%d C:%.1f/%.1f A:%s %s' % (width, height,
+                        '%dX%d %.1f S:%d C:%.1f/%.1f %s %s' % (width, height,
                             fps, chosen_stride, sum_counts[idx], sum_counts[-1],
-                            '%.3f' % area_rate_thres if rm_still else '',
+                            'A:%.5f' % area_rate_thres if rm_still else '',
                             'ST' if is_still_frames[idx] else ''),
                         (2, int(0.06 * height)),
                         cv2.FONT_HERSHEY_SIMPLEX,
@@ -437,6 +446,7 @@ if __name__ == "__main__":
                     os.system('rm /tmp/*.mp4 2>/dev/null')
                     os.system('rm /tmp/tmp*.py 2>/dev/null')
                 time.sleep(0.01)
+                race_report_result('zmp_run', f'{main_args.topic}:3')
         else:
             zmq_cfg = {
                     "pigeon": {"msgkey": "123", "user_code": "123"},
