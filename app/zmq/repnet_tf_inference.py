@@ -336,9 +336,10 @@ def inference(model, opt, resdata):
                     Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
                 cv2.putText(frame_bgr,
-                        '%dX%d F:%.1f S:%d C:%.1f/%.1f %s' % (width, height,
+                        '%dX%d %.1f S:%d C:%.1f/%.1f A:%s %s' % (width, height,
                             fps, chosen_stride, sum_counts[idx], sum_counts[-1],
-                            'STILL' if is_still_frames[idx] else ''),
+                            '%.3f' % area_rate_thres if rm_still else '',
+                            'ST' if is_still_frames[idx] else ''),
                         (2, int(0.06 * height)),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7 if height < 500 else 2,
