@@ -50,6 +50,9 @@ main_args = parser.parse_args()
 
 ffmpeg_args = '-preset ultrafast -vcodec libx264 -pix_fmt yuv420p'
 
+input_width = 112
+input_height = 112
+
 
 def _report_result(msgkey, resdata, errcode=0):
     if _RELEASE_:
@@ -117,19 +120,21 @@ def inference(model, opt, resdata):
     osd_sims = False
     if 'osd_sims' in opt:
         osd_sims = opt.osd_sims
-    area_rate_thres = 0.003
+    area_rate_thres = 0.0001
     if 'area_rate_threshold' in opt:
         area_rate_thres = opt.area_rate_threshold
     best_stride_video = False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
-    focus_box = None
+    focus_box, focus_box_repnum = None, 1
     if 'focus_box' in opt:
         if 0 == opt.focus_box[0] and 0 == opt.focus_box[1] \
                 and 1 == opt.focus_box[2] and 1 == opt.focus_box[3]:
             Logger.warning(f'error box: {opt.focus_box}')
         else:
             focus_box = opt.focus_box
+        if 'focus_box_repnum' in opt:
+            focus_box_repnum = opt.focus_box_repnum
     else:
         if 'center_rate' in opt:
             w_rate, h_rate = opt.center_rate
@@ -204,8 +209,8 @@ def inference(model, opt, resdata):
     _report_result(msgkey, resdata)
     try:
         frames, vid_fps, still_frames = read_video(
-                video_file, width=112, height=112, rot=None,
-                black_box=black_box, focus_box=focus_box,
+                video_file, width=input_width, height=input_height, rot=None,
+                black_box=black_box, focus_box=focus_box, focus_box_repnum=focus_box_repnum,
                 progress_cb=_video_read_progress,
                 rm_still=rm_still, area_rate_thres=area_rate_thres)
     except Exception:
@@ -263,7 +268,7 @@ def inference(model, opt, resdata):
     per_frame_counts = np.asarray(final_per_frame_counts)
     sum_counts = np.cumsum(per_frame_counts)
 
-    del frames
+    # del frames
 
     json_result = {}
     json_result['period'] = pred_period
@@ -347,14 +352,23 @@ def inference(model, opt, resdata):
                 cv2.putText(frame_bgr,
                         '%dX%d %.1f S:%d C:%.1f/%.1f %s %s' % (width, height,
                             fps, chosen_stride, sum_counts[idx], sum_counts[-1],
-                            'A:%.5f' % area_rate_thres if rm_still else '',
+                            'A:%.4f' % area_rate_thres if rm_still else '',
                             'ST' if is_still_frames[idx] else ''),
                         (2, int(0.06 * height)),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7 if height < 500 else 2,
                         (255, 255, 255), 2)
                 if focus_box is not None:
+                    cv2.putText(frame_bgr,
+                            '%.1f' % sum_counts[idx],
+                            (fx1, fy1 + 22),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
                     cv2.rectangle(frame_bgr, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
+
+                if osd_sims and not is_still_frames[idx]:
+                    frame_bgr[height - input_height - 10:, :input_width + 10, :] = 222
+                    frame_bgr[height - input_height - 5:height - 5, 5:input_width + 5, :] = frames[valid_idx][:,:,::-1]
+
                 if idx % 100 == 0:
                     _video_save_progress((90 * float(idx)) / all_frames_count)
 
@@ -392,7 +406,7 @@ def inference(model, opt, resdata):
     with open(json_result_file, 'w') as fw:
         fw.write(json.dumps(json_result, indent=4))
 
-    del json_result, frames_info
+    del frames, still_frames, json_result, frames_info
     if osd_sims:
         del embs_sims
     os.remove(video_file)
