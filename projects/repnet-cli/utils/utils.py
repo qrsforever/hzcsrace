@@ -20,7 +20,7 @@ def cal_rect_points(w, h, box):
 
 def read_video(
         video_filename, width=224, height=224,
-        rot=None, black_box=None, focus_box=None,
+        rot=None, black_box=None, focus_box=None, focus_box_repnum=1,
         progress_cb=None, rm_still=False, area_rate_thres=0.0025):
     """Read video from file."""
     cap = cv2.VideoCapture(video_filename)
@@ -57,6 +57,11 @@ def read_video(
                 frame_bgr[black_y1:black_y2, black_x1:black_x2, :] = 0
             if focus_box is not None:
                 frame_bgr = frame_bgr[focus_y1:focus_y2, focus_x1:focus_x2, :]
+                if focus_box_repnum > 1:
+                    frame_bgr = np.hstack([frame_bgr] * focus_box_repnum)
+                    frame_bgr = np.vstack([frame_bgr] * focus_box_repnum)
+                # frame_bgr = np.hstack([frame_bgr] * 2)
+                # frame_bgr = np.vstack([frame_bgr, cv2.flip(frame_bgr, 0)])
             if rm_still:
                 frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
                 if pre_frame is not None:
@@ -72,8 +77,12 @@ def read_video(
 
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
             frame_rgb = cv2.resize(frame_rgb, (width, height))
-            if rot:
-                frame_rgb = cv2.rotate(frame_rgb, rot)
+            # if rot:
+            #     frame_rgb = cv2.rotate(frame_rgb, rot)
+            # M = cv2.getRotationMatrix2D(center=(int(width / 2), int(height / 2)), angle=45, scale=1.0)
+            # frame_rgb = cv2.warpAffine(frame_rgb, M, (width, height))
+            # frame_rgb = cv2.flip(frame_rgb, -1)
+            # frame_rgb = cv2.rotate(frame_rgb, cv2.ROTATE_90_CLOCKWISE)
             if rm_still and not keep_flag:
                 still_frames.append((frame_idx, frame_rgb))
             else:
