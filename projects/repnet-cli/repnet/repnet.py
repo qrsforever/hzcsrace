@@ -21,7 +21,7 @@ def get_repnet_model(logdir):
     assert tf.executing_eagerly()
 
     # Models will be called in eval mode.
-    tf.keras.backend.set_learning_phase(0)
+    # tf.keras.backend.set_learning_phase(0)
 
     # QRS
     gpus = tf.config.experimental.list_physical_devices('GPU')
@@ -36,7 +36,7 @@ def get_repnet_model(logdir):
     # Define RepNet model.
     model = ResnetPeriodEstimator()
     # tf.function for speed.
-    model.call = tf.function(model.call, experimental_relax_shapes=True)
+    # model.call = tf.function(model.call, experimental_relax_shapes=True)
 
     # Define checkpoint and checkpoint manager.
     ckpt = tf.train.Checkpoint(model=model)

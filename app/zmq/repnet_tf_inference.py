@@ -87,9 +87,6 @@ def inference(model, opt, resdata):
     user_code = 'unkown'
     if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
-    eta = 1.0
-    if 'eta' in opt:
-        eta = opt.eta
     batch_size = 20
     if 'batch_size' in opt:
         batch_size = opt.batch_size
@@ -99,7 +96,7 @@ def inference(model, opt, resdata):
     in_threshold = 0.5
     if 'in_threshold' in opt:
         in_threshold = opt.in_threshold
-    strides = [3, 5, 7, 9, 11, 13, 15, 17, 19, 21]
+    strides = [5, 7, 9, 11, 13]
     if 'strides' in opt:
         strides = list(opt.strides)
     constant_speed = False
@@ -114,12 +111,19 @@ def inference(model, opt, resdata):
     save_video = False
     if 'save_video' in opt:
         save_video = opt.save_video
+    angle = None
+    if 'angle' in opt:
+        angle = opt.angle
     rm_still = True
     if 'rm_still' in opt:
         rm_still = opt.rm_still
     osd_sims = False
     if 'osd_sims' in opt:
         osd_sims = opt.osd_sims
+    temperature = 13.544
+    if 'temperature' in opt:
+        temperature = opt.temperature
+    model.temperature = temperature
     area_rate_thres = 0.0001
     if 'area_rate_threshold' in opt:
         area_rate_thres = opt.area_rate_threshold
@@ -209,7 +213,7 @@ def inference(model, opt, resdata):
     _report_result(msgkey, resdata)
     try:
         frames, vid_fps, still_frames = read_video(
-                video_file, width=input_width, height=input_height, rot=None,
+                video_file, width=input_width, height=input_height, rot=angle,
                 black_box=black_box, focus_box=focus_box, focus_box_repnum=focus_box_repnum,
                 progress_cb=_video_read_progress,
                 rm_still=rm_still, area_rate_thres=area_rate_thres)
@@ -275,7 +279,6 @@ def inference(model, opt, resdata):
     json_result['score'] = np.float(pred_score.numpy())
     json_result['stride'] = chosen_stride
     json_result['fps'] = vid_fps
-    json_result['eta'] = eta
     json_result['num_frames'] = all_frames_count
     if rm_still:
         json_result['num_still_frames'] = len(still_frames)
@@ -295,7 +298,7 @@ def inference(model, opt, resdata):
     json_result['frames_period'] = frames_info
 
     if osd_sims:
-        embs_sims = get_sims(final_embs, temperature=13.544)
+        embs_sims = get_sims(final_embs, temperature=temperature)
         embs_sims = np.squeeze(embs_sims, -1)
         Logger.info(f'embs_sims.shape: {embs_sims.shape}')
 
@@ -317,11 +320,12 @@ def inference(model, opt, resdata):
             stride_vid = cv2.VideoWriter(mp4v_stride_file, fmt, fps, (width, height))
 
         if black_box is not None:
-            bx1, by1, bx2, by2 = cal_rect_points(width, height, black_box) 
+            bx1, by1, bx2, by2 = cal_rect_points(width, height, black_box)
         if focus_box is not None:
-            fx1, fy1, fx2, fy2 = cal_rect_points(width, height, focus_box) 
+            fx1, fy1, fx2, fy2 = cal_rect_points(width, height, focus_box)
         if cap.isOpened():
             idx, valid_idx = 0, 0
+            th = int(0.08 * height)
             osd, osd_size, alpha = 0, int(width*0.25), 0.8 # noqa
             osd_blend = None
             while True:
@@ -333,7 +337,16 @@ def inference(model, opt, resdata):
                         frame_bgr[by1:by2, bx1:bx2, :] = 0
                     else:
                         cv2.rectangle(frame_bgr, (bx1, by1), (bx2, by2), (0, 0, 0), 2)
-                cv2.rectangle(frame_bgr, (0, 0), (width, int(0.08 * height)), (0, 0, 0), -1)
+                    cv2.putText(frame_bgr,
+                            '%d,%d' % (bx1, by1),
+                            (bx1 + 2, by1 + 16),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (210, 210, 210), 1)
+                    cv2.putText(frame_bgr,
+                            '%d,%d' % (bx2, by2),
+                            (bx2 - 65, by2 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (210, 210, 210), 1)
+                cv2.rectangle(frame_bgr, (0, 0), (width, th), (0, 0, 0), -1)
+                cv2.rectangle(frame_bgr, (0, height - th), (width, height), (0, 0, 0), -1)
                 try:
                     if osd_sims and not is_still_frames[idx] \
                             and valid_idx % (chosen_stride * model.num_frames) == 0:
@@ -350,24 +363,37 @@ def inference(model, opt, resdata):
                     Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
                 cv2.putText(frame_bgr,
-                        '%dX%d %.1f S:%d C:%.1f/%.1f %s %s' % (width, height,
+                        '%dX%d %.1f S:%d C:%.1f/%.1f T:%.3f %s' % (width, height,
                             fps, chosen_stride, sum_counts[idx], sum_counts[-1],
-                            'A:%.4f' % area_rate_thres if rm_still else '',
-                            'ST' if is_still_frames[idx] else ''),
+                            temperature, 'ST' if is_still_frames[idx] else ''),
                         (2, int(0.06 * height)),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7 if height < 500 else 2,
                         (255, 255, 255), 2)
                 if focus_box is not None:
                     cv2.putText(frame_bgr,
-                            '%.1f' % sum_counts[idx],
-                            (fx1, fy1 + 22),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                            '%d,%d' % (fx1, fy1),
+                            (fx1 + 2, fy1 + 16),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                    cv2.putText(frame_bgr,
+                            '%d,%d' % (fx2, fy2),
+                            (fx2 - 65, fy2 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     cv2.rectangle(frame_bgr, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
 
                 if osd_sims and not is_still_frames[idx]:
                     frame_bgr[height - input_height - 10:, :input_width + 10, :] = 222
                     frame_bgr[height - input_height - 5:height - 5, 5:input_width + 5, :] = frames[valid_idx][:,:,::-1]
+
+                cv2.putText(frame_bgr,
+                        'S:[%s] P:%d %s %s' % (','.join(map(str, strides)),
+                            focus_box_repnum,
+                            'A:%.4f' % area_rate_thres if rm_still else '',
+                            'R:%.2f' % angle if angle else ''),
+                        (input_width + 12, height - int(th * 0.35)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7 if height < 500 else 2,
+                        (255, 255, 255), 2)
 
                 if idx % 100 == 0:
                     _video_save_progress((90 * float(idx)) / all_frames_count)

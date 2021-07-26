@@ -60,8 +60,6 @@ def read_video(
                 if focus_box_repnum > 1:
                     frame_bgr = np.hstack([frame_bgr] * focus_box_repnum)
                     frame_bgr = np.vstack([frame_bgr] * focus_box_repnum)
-                # frame_bgr = np.hstack([frame_bgr] * 2)
-                # frame_bgr = np.vstack([frame_bgr, cv2.flip(frame_bgr, 0)])
             if rm_still:
                 frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
                 if pre_frame is not None:
@@ -77,12 +75,10 @@ def read_video(
 
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
             frame_rgb = cv2.resize(frame_rgb, (width, height))
-            # if rot:
-            #     frame_rgb = cv2.rotate(frame_rgb, rot)
-            # M = cv2.getRotationMatrix2D(center=(int(width / 2), int(height / 2)), angle=45, scale=1.0)
-            # frame_rgb = cv2.warpAffine(frame_rgb, M, (width, height))
-            # frame_rgb = cv2.flip(frame_rgb, -1)
-            # frame_rgb = cv2.rotate(frame_rgb, cv2.ROTATE_90_CLOCKWISE)
+            if rot:
+                # frame_rgb = cv2.rotate(frame_rgb, rot)
+                M = cv2.getRotationMatrix2D(center=(int(width / 2), int(height / 2)), angle=rot, scale=1.0)
+                frame_rgb = cv2.warpAffine(frame_rgb, M, (width, height))
             if rm_still and not keep_flag:
                 still_frames.append((frame_idx, frame_rgb))
             else:
