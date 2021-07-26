@@ -60,10 +60,7 @@ def _report_result(msgkey, resdata, errcode=0):
             resdata['errno'] = errcode
             resdata['progress'] = 100
         race_report_result(msgkey, resdata)
-        if msgkey.startswith('zmq.repnet_tf'):
-            race_report_result('zmp_run', f'{main_args.topic}_{msgkey}:220')
-        else:
-            race_report_result('zmp_run', f'{main_args.topic}:220')
+        race_report_result('zmp_run', f'{main_args.topic}:220')
     else:
         pass
 
@@ -384,7 +381,7 @@ def inference(model, opt, resdata):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     cv2.rectangle(frame_bgr, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
 
-                if osd_sims and not is_still_frames[idx]:
+                if osd_sims:
                     frame_bgr[height - input_height - 10:, :input_width + 10, :] = 222
                     frame_bgr[height - input_height - 5:height - 5, 5:input_width + 5, :] = frames[valid_idx][:,:,::-1]
 
@@ -469,17 +466,15 @@ if __name__ == "__main__":
         if _RELEASE_:
             while True:
                 Logger.info('wait task')
+                race_report_result('zmp_end', main_args.topic)
                 zmq_cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
+                race_report_result('zmp_run', f'{main_args.topic}:30')
                 zmq_cfg = OmegaConf.create(zmq_cfg)
                 Logger.info(zmq_cfg)
                 if 'pigeon' not in zmq_cfg:
                     continue
                 Logger.info(zmq_cfg.pigeon)
                 resdata = {'pigeon': dict(zmq_cfg.pigeon), 'task': main_args.topic, 'errno': 0}
-                if zmq_cfg.pigeon.msgkey.startswith('zmq.repnet_tf'):
-                    race_report_result('zmp_run', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}:30')
-                else:
-                    race_report_result('zmp_run', f'{main_args.topic}:30')
                 try:
                     inference(repnet_model, zmq_cfg, resdata)
                 except Exception as err:
@@ -491,10 +486,7 @@ if __name__ == "__main__":
                     os.system('rm /tmp/*.mp4 2>/dev/null')
                     os.system('rm /tmp/tmp*.py 2>/dev/null')
                 time.sleep(0.01)
-                if zmq_cfg.pigeon.msgkey.startswith('zmq.repnet_tf'):
-                    race_report_result('zmp_end', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}')
-                else:
-                    race_report_result('zmp_end', f'{main_args.topic}')
+                race_report_result('zmp_run', f'{main_args.topic}:3')
         else:
             zmq_cfg = {
                     "pigeon": {"msgkey": "123", "user_code": "123"},
