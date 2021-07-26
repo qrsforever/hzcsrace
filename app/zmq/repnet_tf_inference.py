@@ -60,7 +60,10 @@ def _report_result(msgkey, resdata, errcode=0):
             resdata['errno'] = errcode
             resdata['progress'] = 100
         race_report_result(msgkey, resdata)
-        race_report_result('zmp_run', f'{main_args.topic}:220')
+        if msgkey.startswith('zmq.repnet_tf'):
+            race_report_result('zmp_run', f'{main_args.topic}_{msgkey}:220')
+        else:
+            race_report_result('zmp_run', f'{main_args.topic}:220')
     else:
         pass
 
@@ -466,15 +469,17 @@ if __name__ == "__main__":
         if _RELEASE_:
             while True:
                 Logger.info('wait task')
-                race_report_result('zmp_end', main_args.topic)
                 zmq_cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
-                race_report_result('zmp_run', f'{main_args.topic}:30')
                 zmq_cfg = OmegaConf.create(zmq_cfg)
                 Logger.info(zmq_cfg)
                 if 'pigeon' not in zmq_cfg:
                     continue
                 Logger.info(zmq_cfg.pigeon)
                 resdata = {'pigeon': dict(zmq_cfg.pigeon), 'task': main_args.topic, 'errno': 0}
+                if zmq_cfg.pigeon.msgkey.startswith('zmq.repnet_tf'):
+                    race_report_result('zmp_run', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}:30')
+                else:
+                    race_report_result('zmp_run', f'{main_args.topic}:30')
                 try:
                     inference(repnet_model, zmq_cfg, resdata)
                 except Exception as err:
@@ -486,7 +491,10 @@ if __name__ == "__main__":
                     os.system('rm /tmp/*.mp4 2>/dev/null')
                     os.system('rm /tmp/tmp*.py 2>/dev/null')
                 time.sleep(0.01)
-                race_report_result('zmp_run', f'{main_args.topic}:3')
+                if zmq_cfg.pigeon.msgkey.startswith('zmq.repnet_tf'):
+                    race_report_result('zmp_end', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}')
+                else:
+                    race_report_result('zmp_end', f'{main_args.topic}')
         else:
             zmq_cfg = {
                     "pigeon": {"msgkey": "123", "user_code": "123"},

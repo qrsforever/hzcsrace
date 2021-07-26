@@ -69,11 +69,14 @@ def _framework_inference():
         if isinstance(cfg, str):
             cfg = json.loads(cfg)
 
-        res = g_redis.get(reqjson['task'])
-        if res and res.decode() == '1':
-            return json.dumps({'errno': -3})
         # TODO
         msgkey = cfg['pigeon']['msgkey']
+        if msgkey.startswith('zmq.repnet_tf'): # notebook call
+            res = g_redis.get(f'{reqjson["task"]}_{msgkey}')
+        else:
+            res = g_redis.get(reqjson['task'])
+        if res and res.decode() == '1':
+            return json.dumps({'errno': -3})
         g_redis.delete(msgkey)
 
         zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(cfg, separators=(',',':'))))
