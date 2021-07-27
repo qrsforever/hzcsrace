@@ -166,7 +166,7 @@ def inference(model, opt, resdata):
     else:
         model_progress_weight = 0.78
 
-    if user_code == 'notebook':
+    if msgkey[:2] == 'nb':
         ts_token = '%d' % time.time()
     else:
         ts_token = 'repnet_tf'
@@ -389,11 +389,11 @@ def inference(model, opt, resdata):
                     frame_bgr[height - input_height - 5:height - 5, 5:input_width + 5, :] = frames[valid_idx][:,:,::-1]
 
                 cv2.putText(frame_bgr,
-                        'S:[%s] P:%d %s %s %s' % (','.join(map(str, strides)),
+                        'S:[%s] P:%d %s %s F:%.3f' % (','.join(map(str, strides)),
                             focus_box_repnum,
                             'A:%.4f' % area_rate_thres if rm_still else '',
-                            'R:%.2f' % angle if angle else '',
-                            'F:%d' % len(frames)),
+                            'R:%.1f' % angle if angle else '',
+                            float(len(frames)) / all_frames_count),
                         (input_width + 12, height - int(th * 0.35)),
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7 if height < 500 else 2,

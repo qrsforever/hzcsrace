@@ -57,6 +57,13 @@ def read_video(
                 frame_bgr[black_y1:black_y2, black_x1:black_x2, :] = 0
             if focus_box is not None:
                 frame_bgr = frame_bgr[focus_y1:focus_y2, focus_x1:focus_x2, :]
+                # frame_bgr = cv2.normalize(frame_bgr, dst=None, alpha=350, beta=10, norm_type=cv2.NORM_MINMAX)
+                # frame_bgr = frame_bgr * float(2)
+                # frame_bgr = np.round(frame_bgr)
+                # frame_bgr[frame_bgr > 255] = 255
+                # frame_bgr = frame_bgr.astype(np.uint8)
+                # image color reverse
+                # frame_bgr = 255 - frame_bgr
                 if focus_box_repnum > 1:
                     frame_bgr = np.hstack([frame_bgr] * focus_box_repnum)
                     frame_bgr = np.vstack([frame_bgr] * focus_box_repnum)
@@ -67,10 +74,15 @@ def read_video(
                     frame_tmp = cv2.threshold(frame_tmp, 20, 255, cv2.THRESH_BINARY)[1]
                     frame_tmp = cv2.dilate(frame_tmp, None, iterations=2)
                     contours, _ = cv2.findContours(frame_tmp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-                    for contour in contours:
-                        if cv2.contourArea(contour) > area_thres:
-                            keep_flag = True
-                            break
+                    if len(contours) > 0:
+                        # contours = sorted(contours, key=lambda x:cv2.contourArea(x), reverse=True)
+                        # if cv2.contourArea(contours[0]) > area_thres:
+                        #     cv2.drawContours(frame_bgr, [contours[0]], 0, (255,255,255), 3)
+                        #     keep_flag = True
+                        for contour in contours:
+                            if cv2.contourArea(contour) > area_thres:
+                                keep_flag = True
+                                break
                 pre_frame = frame_gray
 
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
