@@ -71,7 +71,7 @@ def _framework_inference():
 
         # TODO
         msgkey = cfg['pigeon']['msgkey']
-        if msgkey.startswith('zmq.repnet_tf'): # notebook call
+        if msgkey[:2] == 'nb': # notebook call
             res = g_redis.get(f'{reqjson["task"]}_{msgkey}')
         else:
             res = g_redis.get(reqjson['task'])
