@@ -384,7 +384,7 @@ def inference(model, opt, resdata):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
                     cv2.rectangle(frame_bgr, (fx1, fy1), (fx2, fy2), (0, 255, 0), 2)
 
-                if osd_sims:
+                if osd_sims and valid_idx < len(frames):
                     frame_bgr[height - input_height - 10:, :input_width + 10, :] = 222
                     frame_bgr[height - input_height - 5:height - 5, 5:input_width + 5, :] = frames[valid_idx][:,:,::-1]
 
