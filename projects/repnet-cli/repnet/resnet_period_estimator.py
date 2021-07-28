@@ -93,7 +93,11 @@ class ResnetPeriodEstimator(tf.keras.models.Model):
             include_top=False, weights=None, pooling='max')
         self.base_model = tf.keras.models.Model(
             inputs=base_model.input,
-            outputs=base_model.get_layer(self.base_model_layer_name).output)
+            outputs=[
+                base_model.get_layer('conv2_block2_out').output,
+                base_model.get_layer('conv3_block3_out').output,
+                base_model.get_layer(self.base_model_layer_name).output
+            ])
 
         # 3D Conv on k Frames
         self.temporal_conv_layers = [
@@ -170,7 +174,7 @@ class ResnetPeriodEstimator(tf.keras.models.Model):
         batch_size = tf.shape(x)[0]
         # Conv Feature Extractor.
         x = tf.reshape(x, [-1, self.image_size, self.image_size, 3])
-        x = self.base_model(x)
+        x = self.base_model(x)[-1]
         h = tf.shape(x)[1]
         w = tf.shape(x)[2]
         c = tf.shape(x)[3]

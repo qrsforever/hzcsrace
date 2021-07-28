@@ -68,15 +68,49 @@ def _report_result(msgkey, resdata, errcode=0):
         pass
 
 
+def _denormal_image(x):
+    x -= x.mean()
+    x /= x.std()
+    x *= 64
+    x += 128
+    x = np.clip(x, 0, 255).astype('uint8')
+    return x
+
+
 def draw_osd_sim(sim, size=128):
     fig, ax = plt.subplots()
     plt.axis('off')
     fig.set_size_inches(size / 100.0, size / 100.0)
     plt.gca().xaxis.set_major_locator(plt.NullLocator())
     plt.gca().yaxis.set_major_locator(plt.NullLocator())
-    plt.subplots_adjust(top=1,bottom=0,left=0,right=1,hspace=0,wspace=0)
+    plt.subplots_adjust(top=1, bottom=0, left=0, right=1, hspace=0, wspace=0)
     plt.margins(0,0)
     plt.imshow(sim, cmap='hot', interpolation='nearest', norm=LogNorm())
+    with io.BytesIO() as fw:
+        plt.savefig(fw, dpi=100.0, bbox_inches=0)
+        buffer_ = np.frombuffer(fw.getvalue(), dtype=np.uint8)
+        plt.close()
+        return cv2.imdecode(buffer_, cv2.IMREAD_COLOR)
+    raise
+
+
+def draw_osd_feat(feat, X, Y, width, height):
+    W, H, _ = feat.shape
+    osd_feat = np.zeros((H * Y, W * X))
+    fk = 0
+    for hi in range(Y):
+        for wj in range(X):
+            fmap = _denormal_image(feat[:, :, fk])
+            osd_feat[hi * H:(hi + 1) * H, wj * W:(wj + 1) * W] = fmap
+            fk += 1
+    fig, ax = plt.subplots()
+    plt.axis('off')
+    fig.set_size_inches(width / 100.0, height / 100.0)
+    plt.gca().xaxis.set_major_locator(plt.NullLocator())
+    plt.gca().yaxis.set_major_locator(plt.NullLocator())
+    plt.subplots_adjust(top=1, bottom=0, left=0, right=1, hspace=0, wspace=0)
+    plt.margins(0,0)
+    plt.imshow(osd_feat, cmap='viridis', interpolation='nearest')
     with io.BytesIO() as fw:
         plt.savefig(fw, dpi=100.0, bbox_inches=0)
         buffer_ = np.frombuffer(fw.getvalue(), dtype=np.uint8)
@@ -120,6 +154,9 @@ def inference(model, opt, resdata):
     rm_still = True
     if 'rm_still' in opt:
         rm_still = opt.rm_still
+    osd_feat = False
+    if 'osd_feat' in opt:
+        osd_feat = opt.osd_feat
     osd_sims = False
     if 'osd_sims' in opt:
         osd_sims = opt.osd_sims
@@ -237,7 +274,7 @@ def inference(model, opt, resdata):
 
     (pred_period, pred_score,
             within_period, per_frame_counts,
-            chosen_stride, final_embs) = get_counts(
+            chosen_stride, final_embs, feature_maps) = get_counts(
             model,
             frames,
             strides=strides,
@@ -247,6 +284,7 @@ def inference(model, opt, resdata):
             constant_speed=constant_speed,
             median_filter=median_filter,
             fully_periodic=fully_periodic,
+            osd_feat=osd_feat,
             progress_cb=_model_strides_progress)
     infer_time = time.time() - s_time
     Logger.info('model inference using time: %d, chosen_stride:%d' % (infer_time, chosen_stride))
@@ -406,6 +444,11 @@ def inference(model, opt, resdata):
                     vid.write(frame_bgr)
                 if best_stride_video and not is_still_frames[idx] \
                         and valid_idx % chosen_stride == 0:
+                    if osd_feat:
+                        fmap = draw_osd_feat(feature_maps[0][int(valid_idx / chosen_stride)], 7, 3, 450, 200)
+                        frame_bgr[th:th + 200, 0:450, :] = fmap
+                        fmap = draw_osd_feat(feature_maps[2][int(valid_idx / chosen_stride)], 8, 1, 500, 70)
+                        frame_bgr[-th - 80: -th - 10, width - 500:, :] = fmap
                     stride_vid.write(frame_bgr)
                 if not is_still_frames[idx]:
                     valid_idx += 1
@@ -439,6 +482,8 @@ def inference(model, opt, resdata):
     del frames, still_frames, json_result, frames_info
     if osd_sims:
         del embs_sims
+    if osd_feat:
+        del feature_maps
     os.remove(video_file)
 
     if _RELEASE_:

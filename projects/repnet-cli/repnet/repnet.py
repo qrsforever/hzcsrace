@@ -199,7 +199,7 @@ def get_counts(model, frames, strides, batch_size,
                within_period_threshold,
                constant_speed=False,
                median_filter=False,
-               fully_periodic=False, progress_cb=None):
+               fully_periodic=False, osd_feat=False, progress_cb=None):
     """Pass frames through model and conver period predictions to count."""
     seq_len = len(frames)
     raw_scores_list = []
@@ -295,6 +295,14 @@ def get_counts(model, frames, strides, batch_size,
         else:
             pred_period = seq_len * 0.0
 
+    # feature map
+    if osd_feat:
+        idxes = tf.range(0, len(frames), chosen_stride)
+        chosen_frames = tf.gather(frames, idxes)
+        feature_maps = model.base_model.predict(chosen_frames)
+    else:
+        feature_maps = None
+
     del frames, scores, within_period_scores_list, embs_list
 
     if pred_score < threshold:
@@ -303,7 +311,7 @@ def get_counts(model, frames, strides, batch_size,
         per_frame_counts = np.asarray(len(per_frame_counts) * [0.])
 
     return (pred_period, pred_score, within_period,
-            per_frame_counts, chosen_stride, final_embs)
+            per_frame_counts, chosen_stride, final_embs, feature_maps)
 
 
 def get_score(period_score, within_period_score):
