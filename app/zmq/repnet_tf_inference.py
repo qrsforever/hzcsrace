@@ -226,7 +226,7 @@ def inference(model, opt, resdata):
         oss_domain = 'https://%s' % segs[0]
         if 's3-internal' in oss_domain:
             oss_domain = oss_domain.replace('s3-internal', 's3')
-        if user_code == 'notebook':
+        if msgkey[:2] == 'nb':
             oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], ts_token)
         else:
             oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
