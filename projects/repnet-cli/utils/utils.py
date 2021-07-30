@@ -64,9 +64,6 @@ def read_video(
                 # frame_bgr = frame_bgr.astype(np.uint8)
                 # image color reverse
                 # frame_bgr = 255 - frame_bgr
-                if focus_box_repnum > 1:
-                    frame_bgr = np.hstack([frame_bgr] * focus_box_repnum)
-                    frame_bgr = np.vstack([frame_bgr] * focus_box_repnum)
             if rm_still:
                 frame_gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
                 if pre_frame is not None:
@@ -85,6 +82,10 @@ def read_video(
                                 break
                 pre_frame = frame_gray
 
+            if focus_box is not None:
+                if focus_box_repnum > 1:
+                    frame_bgr = np.hstack([frame_bgr] * focus_box_repnum)
+                    frame_bgr = np.vstack([frame_bgr] * focus_box_repnum)
             frame_rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
             frame_rgb = cv2.resize(frame_rgb, (width, height))
             if rot:
