@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import os
-# import cv2 # noqa
+import cv2
 import json
 
 from abc import ABC, abstractmethod
@@ -205,3 +205,25 @@ class PredictListImageRaw(RawRaceDataset):
 #         if isinstance(path, (list, tuple)):
 #             return path
 #         return [path]
+
+class VideoFramesDataset(Dataset):
+    def __init__(self, video_path, cfg):
+        if isinstance(video_path, list):
+            video_path = video_path[0]
+        if 'data_prefix' in cfg:
+            video_path = f'{cfg.data_prefix}/{video_path}'
+        self.cap = cv2.VideoCapture(video_path)
+        assert self.cap.isOpened(), f'open video error: {video_path}'
+        self.retrieve_count = cfg.retrieve_count
+        self.nframes = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.retrieve_index = range(0, self.nframes, int(self.nframes / self.retrieve_count))
+
+    def __getitem__(self, index):
+        self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.retrieve_index[index])
+        retval, img = self.cap.read()
+        if not retval or index == (self.retrieve_count - 1):
+            self.cap.release()
+        return img, self.retrieve_index[index]
+
+    def __len__(self):
+        return self.retrieve_count

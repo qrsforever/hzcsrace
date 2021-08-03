@@ -48,7 +48,7 @@ RUN sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.d
 RUN $PIP_INSTALL -U pip && \
         $PIP_INSTALL scikit-build zmq protobuf pyhocon omegaconf && \
         $PIP_INSTALL cython opencv-python==4.3.0.36 opencv-contrib-python \
-        scipy==1.5.2 matplotlib tqdm==4.48.2 \
+        scikit-learn scipy==1.5.2 matplotlib tqdm==4.48.2 \
         Minio GPUtil
 
 SHELL ["/bin/bash"]

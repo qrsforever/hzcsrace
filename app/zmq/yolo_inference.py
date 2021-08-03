@@ -10,12 +10,14 @@
 import traceback
 import argparse
 import cv2
+import os
 import torch
+import numpy as np
 from omegaconf import OmegaConf
 
 from yolov5.models.experimental import attempt_load
 from yolov5.utils.torch_utils import select_device
-from yolov5.utils.datasets import LoadImages
+from yolov5.utils.datasets import letterbox, LoadImages
 from yolov5.utils.general import check_img_size, non_max_suppression
 from yolov5.utils.general import scale_coords
 from yolov5.utils.plots import plot_one_box
@@ -28,7 +30,6 @@ import zmq
 
 view_debug = False
 race_set_loglevel('info')
-race_set_logfile('/tmp/raceai-yolo.log')
 
 context = zmq.Context()
 zmqsub = context.socket(zmq.SUB)
@@ -68,10 +69,18 @@ def detect(opt):
             resdata = {'pigeon': dict(cfg.pigeon), 'task': opt.topic, 'errno': 0, 'result': []}
             data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
             for image_path, source in data_loader:
-                dataset = LoadImages(image_path, img_size=imgsz)
-                path, img, im0, _ = next(iter(dataset))
-                # Logger.info(path)
-                resitem = {'image_path': source, 'predict_box':[]}
+                if isinstance(image_path, str):
+                    dataset = LoadImages(image_path, img_size=imgsz)
+                    path, img, im0, _ = next(iter(dataset))
+                    image_file = os.path.basename(source)
+                else:
+                    im0 = image_path
+                    img = letterbox(im0, imgsz)[0]
+                    img = img[:, :, ::-1].transpose(2, 0, 1)
+                    img = np.ascontiguousarray(img)
+                    image_file = f'{source}.jpg'
+
+                resitem = {'image_path': image_file, 'predict_box':[]}
                 img = torch.from_numpy(img).to(device)
                 img = img.half() if half else img.float()
                 img /= 255.0
@@ -95,7 +104,7 @@ def detect(opt):
                             'xyxy': [int(x) for x in xyxy]})
                         if view_debug:
                             plot_one_box(xyxy, im0, label='%.3f' % conf, line_thickness=1)
-                            cv2.imwrite(f'/raceai/data/{i}.png', im0)
+                            cv2.imwrite(f'/raceai/data/{image_file}', im0)
                 resdata['result'].append(resitem)
             resdata['running_time'] = round(time.time() - stime, 3)
             race_report_result(msgkey, resdata)
@@ -121,8 +130,10 @@ if __name__ == '__main__':
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--topic', default='zmq.yolov5l.inference', help='sub topic')
     opt = parser.parse_args()
-    Logger.info(opt)
 
+    race_set_logfile('/tmp/raceai-{opt.topic}.log')
+
+    Logger.info(opt)
     zmqsub.subscribe(opt.topic)
     race_report_result('add_topic', opt.topic)
 

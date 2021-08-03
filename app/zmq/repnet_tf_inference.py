@@ -17,7 +17,11 @@ import traceback
 
 import matplotlib.pyplot as plt
 import io
+import requests
 
+from collections import Counter
+from sklearn.cluster import KMeans
+from scipy.spatial.distance import cdist
 from matplotlib.colors import LogNorm
 from utils import get_model, read_video, cal_rect_points
 from repnet import get_counts, get_sims
@@ -52,6 +56,72 @@ ffmpeg_args = '-preset ultrafast -vcodec libx264 -pix_fmt yuv420p'
 
 input_width = 112
 input_height = 112
+
+
+def _detect_focus(msgkey, vfile, retrieve_count, box_size):
+    msgkey = msgkey + '.det'
+    reqdata = '''{
+        "task": "zmq.yolov5.ladder.l.inference",
+        "cfg": {
+            "pigeon": {
+                "msgkey": "%s",
+                "user": "private",
+                "uuid": "repnet_tf"
+            },
+            "data": {
+                "class_name": "raceai.data.process.VideoDataLoader",
+                "params": {
+                    "data_source": "%s",
+                    "dataset": {
+                        "class_name": "raceai.data.VideoFramesDataset",
+                        "params": {
+                            "retrieve_count": %d
+                        }
+                    }
+                }
+            },
+            "nms":{
+                "conf_thres": 0.25,
+                "iou_thres": 0.45
+            }
+        }
+    }''' % (msgkey, vfile, retrieve_count)
+    RACEURL = 'http://0.0.0.0:9119'
+    API_INFERENCE = f'{RACEURL}/raceai/framework/inference'
+    API_POPMSG = f'{RACEURL}/raceai/private/popmsg'
+    json.loads(requests.get(url=f'{API_POPMSG}?key={msgkey}').text)
+    json.loads(requests.post(url=API_INFERENCE, json=eval(reqdata)).text)
+    for i in range(120):
+        resdata = json.loads(requests.get(url=f'{API_POPMSG}?key={msgkey}').text)
+        for data in resdata:
+            detinfo = {
+                'focus_skewing': False,
+            }
+            centers = []
+            for result in data['result']:
+                box = result['predict_box']
+                if len(box) == 1:
+                    xyxy = box[0]['xyxy']
+                    centers.append((int(0.5 * (xyxy[0] + xyxy[2])), int(0.5 * (xyxy[1] + xyxy[3]))))
+            centers = np.array(centers)
+            model = KMeans(n_clusters=3)
+            clusters = model.fit_predict(centers)
+            centroids = model.cluster_centers_
+            counter = Counter(clusters).most_common()
+            dist = cdist(centroids, centroids, metric='euclidean').max()
+            if len(centers) < 0.1 * retrieve_count or dist > max(box_size):
+                detinfo['focus_skewing'] = True
+            detinfo['valid_count'] = len(centers)
+            center = [int(x) for x in centroids[counter[0][0]]]
+            detinfo['focus_box'] = [
+                    center[0] - box_size[0],
+                    center[1] - box_size[1],
+                    center[0] + box_size[0],
+                    center[1] + box_size[1]]
+            return detinfo
+        Logger.info(f'pop msg: {i}')
+        time.sleep(1)
+    return None
 
 
 def _report_result(msgkey, resdata, errcode=0):
@@ -170,33 +240,45 @@ def inference(model, opt, resdata):
     best_stride_video = False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
-    focus_box, focus_box_repnum = None, 1
-    if 'focus_box' in opt:
-        if 0 == opt.focus_box[0] and 0 == opt.focus_box[1] \
-                and 1 == opt.focus_box[2] and 1 == opt.focus_box[3]:
-            Logger.warning(f'error box: {opt.focus_box}')
-        else:
-            focus_box = opt.focus_box
-        if 'focus_box_repnum' in opt:
-            focus_box_repnum = opt.focus_box_repnum
-    else:
-        if 'center_rate' in opt:
-            w_rate, h_rate = opt.center_rate
-            if w_rate != 0 and h_rate != 0:
-                focus_box = [
-                    (1 - w_rate) * 0.5, (1 - h_rate) * 0.5,
-                    (1 + w_rate) * 0.5, (1 + h_rate) * 0.5,
-                ]
 
+    #### focus
+    detect_focus, retrieve_count, box_size = False, 1, (10, 10)
+    focus_box, focus_box_repnum = None, 1
     black_box, black_overlay = None, False
-    if 'black_box' in opt:
-        if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
-                and 0 == opt.black_box[2] and 0 == opt.black_box[3]:
-            Logger.warning('error black box: {opt.black_box')
+    if 'detect_focus' in opt:
+        detect_focus = opt.detect_focus
+    if not detect_focus:
+        if 'focus_box' in opt:
+            if 0 == opt.focus_box[0] and 0 == opt.focus_box[1] \
+                    and 1 == opt.focus_box[2] and 1 == opt.focus_box[3]:
+                Logger.warning(f'error box: {opt.focus_box}')
+            else:
+                focus_box = opt.focus_box
         else:
-            black_box = opt.black_box
-        if 'black_overlay' in opt:
-            black_overlay = opt['black_overlay']
+            if 'center_rate' in opt:
+                w_rate, h_rate = opt.center_rate
+                if w_rate != 0 and h_rate != 0:
+                    focus_box = [
+                        (1 - w_rate) * 0.5, (1 - h_rate) * 0.5,
+                        (1 + w_rate) * 0.5, (1 + h_rate) * 0.5,
+                    ]
+        if 'black_box' in opt:
+            if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
+                    and 0 == opt.black_box[2] and 0 == opt.black_box[3]:
+                Logger.warning('error black box: {opt.black_box')
+            else:
+                black_box = opt.black_box
+            if 'black_overlay' in opt:
+                black_overlay = opt['black_overlay']
+    else:
+        if 'retrieve_count' in opt:
+            retrieve_count = opt.retrieve_count
+        if 'box_size' in opt:
+            box_size = opt.box_size
+            if isinstance(box_size, int):
+                box_size = (box_size, box_size)
+    if 'focus_box_repnum' in opt:
+        focus_box_repnum = opt.focus_box_repnum
 
     if save_video or best_stride_video:
         model_progress_weight = 0.40
@@ -252,6 +334,14 @@ def inference(model, opt, resdata):
     resdata['progress'] = 0.0
     _report_result(msgkey, resdata)
     try:
+        if detect_focus:
+            Logger.info('detect focus...')
+            detinfo = _detect_focus(msgkey, video_file, retrieve_count, box_size)
+            if detinfo:
+                Logger.info(detinfo)
+                resdata['detinfo'] = detinfo
+                focus_box = detinfo['focus_box']
+
         frames, vid_fps, still_frames = read_video(
                 video_file, width=input_width, height=input_height, rot=angle,
                 black_box=black_box, focus_box=focus_box, focus_box_repnum=focus_box_repnum,
@@ -261,6 +351,7 @@ def inference(model, opt, resdata):
         _report_result(msgkey, resdata, errcode=-20)
         Logger.warning('read video error: %s' % opt.video)
         Logger.error(traceback.format_exc(limit=3))
+        os.remove(video_file)
         return
     if len(frames) <= 64:
         _report_result(msgkey, resdata, errcode=-21)

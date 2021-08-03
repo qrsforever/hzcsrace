@@ -81,6 +81,11 @@ class PathListDataLoader(BaseDataLoader):
         super().__init__(cfg.data_source, cfg)
 
 
+class VideoDataLoader(BaseDataLoader):
+    def __init__(self, cfg):
+        super().__init__(cfg.data_source, cfg)
+
+
 class LocalDataLoader(BaseDataLoader):
     def __init__(self, cfg):
         super().__init__(cfg.data_source, cfg)
