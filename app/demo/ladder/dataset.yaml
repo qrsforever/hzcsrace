@@ -1,6 +1,6 @@
 train: /raceai/data/datasets/ladder/images/train
 val: /raceai/data/datasets/ladder/images/val
 
-nc: 1
+nc: 2
 
-names: ['cutter']
+names: ['incise', 'stiletto']

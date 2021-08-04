@@ -108,16 +108,26 @@ def _detect_focus(msgkey, vfile, retrieve_count, box_size):
             clusters = model.fit_predict(centers)
             centroids = model.cluster_centers_
             counter = Counter(clusters).most_common()
-            dist = cdist(centroids, centroids, metric='euclidean').max()
-            if len(centers) < 0.1 * retrieve_count or dist > max(box_size):
-                detinfo['focus_skewing'] = True
+            indexes = []
+            for cid, cnt in counter:
+                if cnt < 0.05 * retrieve_count:
+                    continue
+                indexes.append(cid)
+            if len(indexes) > 0:
+                data = [centroids[x] for x in indexes]
+                dist = cdist(data, data, metric='euclidean').max()
+                if len(centers) < 0.1 * retrieve_count or dist > max(box_size):
+                    detinfo['focus_skewing'] = True
+                    detinfo['max_cdist'] = int(dist)
+            detinfo['counter'] = [(int(x), int(y)) for x, y in counter]
+            detinfo['centroids'] = [(round(x), round(y)) for x, y in centroids.tolist()]
             detinfo['valid_count'] = len(centers)
             center = [int(x) for x in centroids[counter[0][0]]]
             detinfo['focus_box'] = [
-                    center[0] - box_size[0],
-                    center[1] - box_size[1],
-                    center[0] + box_size[0],
-                    center[1] + box_size[1]]
+                center[0] - box_size[0],
+                center[1] - box_size[1],
+                center[0] + box_size[0],
+                center[1] + box_size[1]]
             return detinfo
         Logger.info(f'pop msg: {i}')
         time.sleep(1)
