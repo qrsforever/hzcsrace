@@ -206,7 +206,6 @@ class PredictListImageRaw(RawRaceDataset):
 #             return path
 #         return [path]
 
-from raceai.utils.logger import Logger
 class VideoFramesDataset(Dataset):
     def __init__(self, video_path, cfg):
         if isinstance(video_path, list):
@@ -222,10 +221,7 @@ class VideoFramesDataset(Dataset):
     def __getitem__(self, index):
         self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.retrieve_index[index])
         retval, img = self.cap.read()
-        Logger.info(f'-----------{index} {self.nframes} {self.retrieve_count} {len(self.retrieve_index)}')
         if not retval or index == (self.retrieve_count - 1):
-            Logger.info('-------------------release')
-            print('release cap')
             self.cap.release()
         return img, self.retrieve_index[index]
 
