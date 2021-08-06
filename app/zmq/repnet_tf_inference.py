@@ -58,7 +58,21 @@ input_width = 112
 input_height = 112
 
 
-def _detect_focus(msgkey, vfile, retrieve_count, box_size):
+def _report_result(msgkey, resdata, errcode=0):
+    if _RELEASE_:
+        if errcode < 0:
+            resdata['errno'] = errcode
+            resdata['progress'] = 100
+        race_report_result(msgkey, resdata)
+        if msgkey[:2] == 'nb':
+            race_report_result('zmp_run', f'{main_args.topic}_{msgkey}:220')
+        else:
+            race_report_result('zmp_run', f'{main_args.topic}:220')
+    else:
+        pass
+
+
+def _detect_focus(msgkey, vfile, retrieve_count, conf_thresh, iou_thresh, box_size, progress_cb):
     msgkey = msgkey + '.det'
     reqdata = '''{
         "task": "zmq.yolov5.ladder.l.inference",
@@ -81,29 +95,32 @@ def _detect_focus(msgkey, vfile, retrieve_count, box_size):
                 }
             },
             "nms":{
-                "conf_thres": 0.25,
-                "iou_thres": 0.45
+                "conf_thres": %f,
+                "iou_thres": %f
             }
         }
-    }''' % (msgkey, vfile, retrieve_count)
+    }''' % (msgkey, vfile, retrieve_count, conf_thresh, iou_thresh)
     RACEURL = 'http://0.0.0.0:9119'
     API_INFERENCE = f'{RACEURL}/raceai/framework/inference'
     API_POPMSG = f'{RACEURL}/raceai/private/popmsg'
     json.loads(requests.get(url=f'{API_POPMSG}?key={msgkey}').text)
     json.loads(requests.post(url=API_INFERENCE, json=eval(reqdata)).text)
-    for i in range(120):
+    for i in range(200):
         resdata = json.loads(requests.get(url=f'{API_POPMSG}?key={msgkey}').text)
         for data in resdata:
             detinfo = {
-                'focus_skewing': False,
+                'focus_skewing': True,
             }
             centers = []
+            detect_box = {}
             for result in data['result']:
+                frame_idx = int(result['image_path'].split('.')[0])
                 imagew = result['image_width']
                 imageh = result['image_height']
                 box = result['predict_box']
-                if len(box) == 1:
-                    xyxy = box[0]['xyxy']
+                if len(box) > 0:
+                    detect_box[frame_idx] = box[-1]
+                    xyxy = box[-1]['xyxy'] # last is the max confidence score
                     centers.append((int(0.5 * (xyxy[0] + xyxy[2])), int(0.5 * (xyxy[1] + xyxy[3]))))
             centers = np.array(centers)
             model = KMeans(n_clusters=3)
@@ -112,42 +129,32 @@ def _detect_focus(msgkey, vfile, retrieve_count, box_size):
             counter = Counter(clusters).most_common()
             indexes = []
             for cid, cnt in counter:
-                if cnt < 0.05 * retrieve_count:
+                if cnt < 0.1 * retrieve_count:
                     continue
                 indexes.append(cid)
-            if len(indexes) > 0:
+            if len(centers) > 0.2 * retrieve_count and len(indexes) > 0:
+                Logger.info(indexes)
                 data = [centroids[x] for x in indexes]
                 dist = cdist(data, data, metric='euclidean').max()
-                if len(centers) < 0.1 * retrieve_count or dist > max(box_size):
-                    detinfo['focus_skewing'] = True
+                if dist > min(50, 0.5 * max(box_size)):
                     detinfo['max_cdist'] = int(dist)
+                else:
+                    detinfo['focus_skewing'] = False
             detinfo['counter'] = [(int(x), int(y)) for x, y in counter]
             detinfo['centroids'] = [(round(x), round(y)) for x, y in centroids.tolist()]
             detinfo['valid_count'] = len(centers)
             center = [int(x) for x in centroids[counter[0][0]]]
             detinfo['focus_box'] = [
-                np.clip(center[0] - box_size[0], 0, imagew - box_size[0]),
-                np.clip(center[1] - box_size[1], 0, imageh - box_size[1]),
-                np.clip(center[0] + box_size[0], imagew + box_size[0], imagew),
-                np.clip(center[1] + box_size[1], imageh + box_size[1], imageh)]
+                min(max(center[0] - box_size[0], 0), imagew - box_size[0]),
+                min(max(center[1] - box_size[1], 0), imageh - box_size[1]),
+                min(center[0] + box_size[0], imagew),
+                min(center[1] + box_size[1], imageh)]
+            Logger.info(detinfo)
+            detinfo['detect_box'] = detect_box
             return detinfo
-        Logger.info(f'pop msg: {i}')
+        progress_cb(100 * min(float(i * 15) / retrieve_count, 1))
         time.sleep(1)
     return None
-
-
-def _report_result(msgkey, resdata, errcode=0):
-    if _RELEASE_:
-        if errcode < 0:
-            resdata['errno'] = errcode
-            resdata['progress'] = 100
-        race_report_result(msgkey, resdata)
-        if msgkey[:2] == 'nb':
-            race_report_result('zmp_run', f'{main_args.topic}_{msgkey}:220')
-        else:
-            race_report_result('zmp_run', f'{main_args.topic}:220')
-    else:
-        pass
 
 
 def _denormal_image(x):
@@ -255,6 +262,7 @@ def inference(model, opt, resdata):
 
     #### focus
     detect_focus, retrieve_count, box_size = False, 1, (10, 10)
+    conf_thresh, iou_thresh = 0.5, 0.5
     focus_box, focus_box_repnum = None, 1
     black_box, black_overlay = None, False
     if 'detect_focus' in opt:
@@ -289,13 +297,22 @@ def inference(model, opt, resdata):
             box_size = opt.box_size
             if isinstance(box_size, int):
                 box_size = (box_size, box_size)
+        if 'conf_thresh' in opt:
+            conf_thresh = opt.conf_thresh
+        if 'iou_thresh' in opt:
+            iou_thresh = opt.iou_thresh
     if 'focus_box_repnum' in opt:
         focus_box_repnum = opt.focus_box_repnum
 
-    if save_video or best_stride_video:
-        model_progress_weight = 0.40
+    if detect_focus:
+        read_video_weight = 0.2
     else:
-        model_progress_weight = 0.78
+        read_video_weight = 0.3
+
+    if save_video or best_stride_video:
+        model_progress_weight = 0.30
+    else:
+        model_progress_weight = 0.68
 
     if msgkey[:2] == 'nb':
         ts_token = '%d' % time.time()
@@ -329,12 +346,20 @@ def inference(model, opt, resdata):
         oss_path = '/tmp/debug/repent_tf'
         video_file = opt.video
 
+    def _detect_focus_progress(x):
+        resdata['progress'] = round(x * 0.1, 2)
+        Logger.info(resdata['progress'])
+        _report_result(msgkey, resdata)
+
     def _video_read_progress(x):
-        resdata['progress'] = round(x * 0.2, 2)
+        if detect_focus:
+            resdata['progress'] = round(10 + x * read_video_weight, 2)
+        else:
+            resdata['progress'] = round(x * read_video_weight, 2)
         _report_result(msgkey, resdata)
 
     def _model_strides_progress(x):
-        resdata['progress'] = round(20 + x * model_progress_weight, 2)
+        resdata['progress'] = round(30 + x * model_progress_weight, 2)
         Logger.info(resdata['progress'])
         _report_result(msgkey, resdata)
 
@@ -348,10 +373,8 @@ def inference(model, opt, resdata):
     try:
         if detect_focus:
             Logger.info('detect focus...')
-            detinfo = _detect_focus(msgkey, video_file, retrieve_count, box_size)
+            detinfo = _detect_focus(msgkey, video_file, retrieve_count, conf_thresh, iou_thresh, box_size, _detect_focus_progress)
             if detinfo:
-                Logger.info(detinfo)
-                resdata['detinfo'] = detinfo
                 focus_box = detinfo['focus_box']
 
         frames, vid_fps, still_frames = read_video(
@@ -446,6 +469,11 @@ def inference(model, opt, resdata):
         embs_sims = np.squeeze(embs_sims, -1)
         Logger.info(f'embs_sims.shape: {embs_sims.shape}')
 
+    detect_box = None
+    if detect_focus and detinfo:
+        detect_box = detinfo.pop('detect_box')
+        resdata['detinfo'] = detinfo
+
     del within_period, per_frame_counts, final_embs
 
     if save_video or best_stride_video:
@@ -468,6 +496,7 @@ def inference(model, opt, resdata):
         if focus_box is not None:
             fx1, fy1, fx2, fy2 = cal_rect_points(width, height, focus_box)
         if cap.isOpened():
+            cur_db = None
             idx, valid_idx = 0, 0
             th = int(0.08 * height)
             osd, osd_size, alpha = 0, int(width*0.25), 0.8 # noqa
@@ -528,6 +557,16 @@ def inference(model, opt, resdata):
                 if osd_sims and valid_idx < len(frames):
                     frame_bgr[height - input_height - 10:, :input_width + 10, :] = 222
                     frame_bgr[height - input_height - 5:height - 5, 5:input_width + 5, :] = frames[valid_idx][:,:,::-1]
+
+                if detect_box:
+                    if idx in detect_box:
+                        cur_db = detect_box[idx]
+                    if cur_db:
+                        xyxy = cur_db['xyxy']
+                        cv2.rectangle(frame_bgr, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (211, 211, 211), 2)
+                        cv2.putText(frame_bgr, cur_db['conf'],
+                                (xyxy[0] + 2, xyxy[1] + 2),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
                 cv2.putText(frame_bgr,
                         'S:[%s] P:%d %s %s F:%.3f' % (','.join(map(str, strides)),

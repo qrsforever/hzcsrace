@@ -75,11 +75,12 @@ def detect(opt):
                     image_file = os.path.basename(source)
                 else:
                     im0 = image_path
+                    if im0 is None: # TODO
+                        break
                     img = letterbox(im0, imgsz)[0]
                     img = img[:, :, ::-1].transpose(2, 0, 1)
                     img = np.ascontiguousarray(img)
                     image_file = f'{source}.jpg'
-
                 resitem = {
                         'image_path': image_file,
                         'image_width': im0.shape[1],
