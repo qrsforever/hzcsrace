@@ -80,7 +80,11 @@ def detect(opt):
                     img = np.ascontiguousarray(img)
                     image_file = f'{source}.jpg'
 
-                resitem = {'image_path': image_file, 'predict_box':[]}
+                resitem = {
+                        'image_path': image_file,
+                        'image_width': im0.shape[1],
+                        'image_height': im0.shape[0],
+                        'predict_box':[]}
                 img = torch.from_numpy(img).to(device)
                 img = img.half() if half else img.float()
                 img /= 255.0

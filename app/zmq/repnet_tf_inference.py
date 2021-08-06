@@ -99,6 +99,8 @@ def _detect_focus(msgkey, vfile, retrieve_count, box_size):
             }
             centers = []
             for result in data['result']:
+                imagew = result['image_width']
+                imageh = result['image_height']
                 box = result['predict_box']
                 if len(box) == 1:
                     xyxy = box[0]['xyxy']
@@ -124,10 +126,10 @@ def _detect_focus(msgkey, vfile, retrieve_count, box_size):
             detinfo['valid_count'] = len(centers)
             center = [int(x) for x in centroids[counter[0][0]]]
             detinfo['focus_box'] = [
-                center[0] - box_size[0],
-                center[1] - box_size[1],
-                center[0] + box_size[0],
-                center[1] + box_size[1]]
+                np.clip(center[0] - box_size[0], 0, imagew - box_size[0]),
+                np.clip(center[1] - box_size[1], 0, imageh - box_size[1]),
+                np.clip(center[0] + box_size[0], imagew + box_size[0], imagew),
+                np.clip(center[1] + box_size[1], imageh + box_size[1], imageh)]
             return detinfo
         Logger.info(f'pop msg: {i}')
         time.sleep(1)
