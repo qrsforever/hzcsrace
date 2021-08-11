@@ -15,8 +15,8 @@ import matplotlib.pyplot as plt # noqa
 
 from omegaconf import OmegaConf
 from torchvision import transforms
-from detectron2.engine import DefaultPredictor
-from detectron2.utils.visualizer import Visualizer, ColorMode
+# from detectron2.engine import DefaultPredictor
+# from detectron2.utils.visualizer import Visualizer, ColorMode
 
 from raceai.utils.registrable import FunctionRegister
 from raceai.utils.error import catch_error
@@ -62,48 +62,48 @@ def image_classifier_test_pl(cfg):
     return {'errno': 0, 'result': result[0]['output']}
 
 
-@catch_error
-@FunctionRegister.register('det.inference')
-def image_detection_test(cfg):
-    # Data
-    data_loader = race_load_class(cfg.data.class_name)(cfg.cache_dir, cfg.data.params)
-    test_loader = data_loader.get_testloader()
-
-    # Model
-    test_model = race_load_class(cfg.model.class_name)(cfg.model.params)
-    _cfg = test_model.merge_cfg(cfg.runner.yaml_file)
-    _cfg.OUTPUT_DIR = cfg.runner.cache_dir
-
-    # Test
-    im = test_loader.dataset[0]
-    outputs = DefaultPredictor(_cfg)(im)
-
-    # Result
-    v = Visualizer(
-        im[:, :, ::-1],
-        scale=1.,
-        instance_mode=ColorMode.IMAGE
-    )
-
-    instances = outputs['instances'].to('cpu')
-    if instances.has('pred_masks'):
-        instances.remove('pred_masks')
-    v = v.draw_instance_predictions(instances)
-
-    plt.figure(figsize=(14, 10))
-    plt.imshow(cv2.cvtColor(v.get_image()[:, :, ::-1], cv2.COLOR_BGR2RGB))
-    plt.show()
-
-    result = 'ok'
-    # img = Image.fromarray(v.get_image())
-    # img.save('/raceai/tmp/test.png')
-    # bio = io.BytesIO()
-    # img.save(bio, "PNG")
-    # bio.seek(0)
-    # result = {
-    #     'b64img': base64.b64encode(bio.read()).decode(),
-    # }
-    return {'errno': 0, 'result': result}
+# @catch_error
+# @FunctionRegister.register('det.inference')
+# def image_detection_test(cfg):
+#     # Data
+#     data_loader = race_load_class(cfg.data.class_name)(cfg.cache_dir, cfg.data.params)
+#     test_loader = data_loader.get_testloader()
+# 
+#     # Model
+#     test_model = race_load_class(cfg.model.class_name)(cfg.model.params)
+#     _cfg = test_model.merge_cfg(cfg.runner.yaml_file)
+#     _cfg.OUTPUT_DIR = cfg.runner.cache_dir
+# 
+#     # Test
+#     im = test_loader.dataset[0]
+#     outputs = DefaultPredictor(_cfg)(im)
+# 
+#     # Result
+#     v = Visualizer(
+#         im[:, :, ::-1],
+#         scale=1.,
+#         instance_mode=ColorMode.IMAGE
+#     )
+# 
+#     instances = outputs['instances'].to('cpu')
+#     if instances.has('pred_masks'):
+#         instances.remove('pred_masks')
+#     v = v.draw_instance_predictions(instances)
+# 
+#     plt.figure(figsize=(14, 10))
+#     plt.imshow(cv2.cvtColor(v.get_image()[:, :, ::-1], cv2.COLOR_BGR2RGB))
+#     plt.show()
+# 
+#     result = 'ok'
+#     # img = Image.fromarray(v.get_image())
+#     # img.save('/raceai/tmp/test.png')
+#     # bio = io.BytesIO()
+#     # img.save(bio, "PNG")
+#     # bio.seek(0)
+#     # result = {
+#     #     'b64img': base64.b64encode(bio.read()).decode(),
+#     # }
+#     return {'errno': 0, 'result': result}
 
 
 @catch_error

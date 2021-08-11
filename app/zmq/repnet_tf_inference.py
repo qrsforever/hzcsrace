@@ -21,7 +21,7 @@ import requests
 
 from collections import Counter
 from sklearn.cluster import KMeans
-from scipy.spatial.distance import cdist
+from scipy.spatial.distance import cdist # noqa
 from matplotlib.colors import LogNorm
 from utils import get_model, read_video, cal_rect_points
 from repnet import get_counts, get_sims
@@ -107,13 +107,13 @@ def _detect_focus(msgkey, vfile, retrieve_count, conf_thresh, iou_thresh, box_si
     json.loads(requests.post(url=API_INFERENCE, json=eval(reqdata)).text)
     for i in range(200):
         resdata = json.loads(requests.get(url=f'{API_POPMSG}?key={msgkey}').text)
-        for data in resdata:
+        for item in resdata:
             detinfo = {
                 'focus_skewing': True,
             }
             centers = []
             detect_box = {}
-            for result in data['result']:
+            for result in item['result']:
                 frame_idx = int(result['image_path'].split('.')[0])
                 imagew = result['image_width']
                 imageh = result['image_height']
@@ -123,27 +123,29 @@ def _detect_focus(msgkey, vfile, retrieve_count, conf_thresh, iou_thresh, box_si
                     xyxy = box[-1]['xyxy'] # last is the max confidence score
                     centers.append((int(0.5 * (xyxy[0] + xyxy[2])), int(0.5 * (xyxy[1] + xyxy[3]))))
             centers = np.array(centers)
-            model = KMeans(n_clusters=3)
-            clusters = model.fit_predict(centers)
-            centroids = model.cluster_centers_
-            counter = Counter(clusters).most_common()
-            indexes = []
-            for cid, cnt in counter:
-                if cnt < 0.1 * retrieve_count:
-                    continue
-                indexes.append(cid)
-            if len(centers) > 0.2 * retrieve_count and len(indexes) > 0:
-                Logger.info(indexes)
-                data = [centroids[x] for x in indexes]
-                dist = cdist(data, data, metric='euclidean').max()
-                if dist > min(50, 0.5 * max(box_size)):
-                    detinfo['max_cdist'] = int(dist)
-                else:
-                    detinfo['focus_skewing'] = False
-            detinfo['counter'] = [(int(x), int(y)) for x, y in counter]
-            detinfo['centroids'] = [(round(x), round(y)) for x, y in centroids.tolist()]
+            if len(centers) < 0.2 * retrieve_count:
+                Logger.warning('not detect focus box')
+                return None
             detinfo['valid_count'] = len(centers)
-            center = [int(x) for x in centroids[counter[0][0]]]
+            half_cnt = int(0.5 * len(centers))
+            model = KMeans(n_clusters=3)
+            model.fit_predict(centers[:half_cnt])
+            centroid1 = model.cluster_centers_
+            model.fit_predict(centers[half_cnt:])
+            centroid2 = model.cluster_centers_
+
+            # Logger.info(f'{centroid1} vs {centroid2}')
+
+            dist = np.linalg.norm(centroid1.mean(axis=0) - centroid2.mean(axis=0))
+            if dist > min(50, 0.5 * max(box_size)):
+                detinfo['centroid_dist'] = dist
+            else:
+                detinfo['focus_skewing'] = False
+
+            clusters = model.fit_predict(centers)
+            most_idx = Counter(clusters).most_common()[0][0]
+            center = [int(x) for x in model.cluster_centers_[most_idx]]
+
             detinfo['focus_box'] = [
                 min(max(center[0] - box_size[0], 0), imagew - box_size[0]),
                 min(max(center[1] - box_size[1], 0), imageh - box_size[1]),
