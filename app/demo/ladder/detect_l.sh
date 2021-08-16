@@ -15,4 +15,6 @@ python3 /raceai/codes/projects/yolov5/detect.py \
     --source /raceai/data/tmp/${png} --save-txt \
     --weights /raceai/data/tmp/${pro}_l/weights/best.pt \
     --project /raceai/data/tmp --name ${pro}_l --exist-ok \
-    --conf-thres 0.8 --iou-thres 0.6 --device cpu
+    --conf-thres 0.2 --iou-thres 0.2 --device cpu
+
+mv /raceai/data/tmp/${pro}_l/${png} /raceai/data/tmp/result_${png}
