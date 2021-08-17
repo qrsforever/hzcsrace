@@ -39,6 +39,7 @@ __start_raceai()
         --volume /raceai/data:/raceai/data \
         --volume /raceai/data/users/outputs:/outputs \
         --volume $TOP_DIR/app:/raceai/codes/app \
+        --volume $TOP_DIR/projects:/raceai/codes/projects \
         --volume /data/pretrained/cv:/root/.cache/torch/hub/checkpoints \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         $REPOSITORY $cmd
