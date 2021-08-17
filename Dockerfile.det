@@ -1,0 +1,41 @@
+FROM hzcsai_com/raceai_base
+
+ARG VENDOR
+ARG PROJECT
+ARG REPOSITORY
+ARG TAG
+ARG DATE
+ARG VERSION
+ARG URL
+ARG COMMIT
+ARG BRANCH
+
+LABEL org.label-schema.schema-version="1.0" \
+      org.label-schema.build-date=$DATE \
+      org.label-schema.name=$REPOSITORY \
+      org.label-schema.description="HZCS RACE DET Base" \
+      org.label-schema.url="https://www.hzcsai.com" \
+      org.label-schema.vcs-url=$URL \
+      org.label-schema.vcs-ref=$COMMIT \
+      org.label-schema.vcs-branch=$BRANCH \
+      org.label-schema.vendor=$VENDOR \
+      org.label-schema.version=$VERSION
+
+LABEL com.nvidia.volumes.needed="nvidia_driver"
+
+WORKDIR /raceai
+
+ENV PYTHONPATH=/raceai/codes/app:$PYTHONPATH
+
+RUN $APT_INSTALL libyaml-dev locales
+RUN $PIP_INSTALL -U pip && \
+        $PIP_INSTALL pycocotools==2.0.0 scipy==1.1.0 cython matplotlib \
+        thop seaborn \
+        Minio
+
+RUN cd / && git clone --depth 1 https://github.com.cnpmjs.org/JunnYu/mish-cuda && \
+        cd mish-cuda && python setup.py build install
+
+SHELL ["/bin/bash"]
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

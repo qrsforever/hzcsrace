@@ -35,6 +35,9 @@ do
                 --img-size 640 --conf-thres 0.25 --iou-thres 0.85 \
                 --device 0
             ;;
+        "yolor")
+            sleep 100
+            ;;
         "pl")
             python3 zmq/pl_inference.py \
                 --weights /ckpts/${MODEL_WEIGHTS} \
