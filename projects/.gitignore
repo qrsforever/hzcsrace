@@ -1,6 +1,7 @@
 .allennlp
 .detectron2
 .yolov5
+.yolor
 .pytorch-lightning
 .fnst/
 .AlphaPose
