@@ -57,7 +57,7 @@ def train(hyp, opt, device, tb_writer=None, wandb=None):
         yaml.dump(vars(opt), f, sort_keys=False)
 
     # Configure
-    plots = not opt.evolve  # create plots
+    plots = False # not opt.evolve  # create plots
     cuda = device.type != 'cpu'
     init_seeds(2 + rank)
     with open(opt.data) as f:

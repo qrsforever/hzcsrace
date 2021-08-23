@@ -16,7 +16,5 @@ python3 /raceai/codes/projects/yolov5/detect.py \
     --img-size 640 \
     --source ${pro_dir}/${png} --save-txt \
     --project ${pro_dir} --name ${pro}_l --exist-ok \
-    --conf-thres 0.2 --iou-thres 0.15 --device cpu \
+    --conf-thres 0.1 --iou-thres 0.1 --device cpu \
     --weights ${pro_dir}/${pro}_l/weights/last.pt
-
-mv ${pro_dir}/${pro}_l/${png} ${pro_dir}/result_${png}
