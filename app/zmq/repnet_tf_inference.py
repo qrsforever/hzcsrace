@@ -212,6 +212,8 @@ def draw_osd_feat(feat, X, Y, width, height):
 
 def inference(model, opt, resdata):
     msgkey = opt.pigeon.msgkey
+    osd_sims = False
+    best_stride_video = False
     user_code = 'unkown'
     if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
@@ -227,6 +229,10 @@ def inference(model, opt, resdata):
     strides = [5, 7, 9, 11, 13]
     if 'strides' in opt:
         strides = list(opt.strides)
+        if strides[0] == -1: # TODO for debug
+            strides = strides[1:]
+            osd_sims = True
+            best_stride_video = True
     constant_speed = False
     if 'constant_speed' in opt:
         constant_speed = opt.constant_speed
@@ -248,17 +254,15 @@ def inference(model, opt, resdata):
     osd_feat = False
     if 'osd_feat' in opt:
         osd_feat = opt.osd_feat
-    osd_sims = False
     if 'osd_sims' in opt:
         osd_sims = opt.osd_sims
     temperature = 13.544
     if 'temperature' in opt:
         temperature = opt.temperature
     model.temperature = temperature
-    area_rate_thres = 0.0001
+    area_rate_thres = 0.002
     if 'area_rate_threshold' in opt:
         area_rate_thres = opt.area_rate_threshold
-    best_stride_video = False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
 
