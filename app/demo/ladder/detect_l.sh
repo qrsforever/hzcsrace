@@ -2,17 +2,19 @@
 
 png=test.png
 pro=ladder
+pro_dir=/raceai/data/tmp
 
 if [[ x$1 != x ]]
 then
     png=$1
 fi
 
-rm -rf /raceai/data/tmp/${pro}_l/labels
-rm -rf /raceai/data/tmp/${pro}_l/*.png
+rm -rf ${pro_dir}/${pro}_l/labels
+rm -rf ${pro_dir}/${pro}_l/*.png
 
 python3 /raceai/codes/projects/yolov5/detect.py \
-    --source /raceai/data/tmp/${png} --save-txt \
-    --weights /raceai/data/tmp/${pro}_l/weights/best.pt \
-    --project /raceai/data/tmp --name ${pro}_l --exist-ok \
-    --conf-thres 0.8 --iou-thres 0.6 --device cpu
+    --img-size 640 \
+    --source ${pro_dir}/${png} --save-txt \
+    --project ${pro_dir} --name ${pro}_l --exist-ok \
+    --conf-thres 0.1 --iou-thres 0.1 --device cpu \
+    --weights ${pro_dir}/${pro}_l/weights/last.pt

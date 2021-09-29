@@ -3,4 +3,5 @@ val: /raceai/data/datasets/ladder/images/val
 
 nc: 2
 
-names: ['incise', 'stiletto']
+# names: ['incise', 'stiletto']
+names: ['0', '1']
