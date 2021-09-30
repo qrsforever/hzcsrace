@@ -212,7 +212,6 @@ def draw_osd_feat(feat, X, Y, width, height):
 
 def inference(model, opt, resdata):
     msgkey = opt.pigeon.msgkey
-    osd_sims = False
     best_stride_video = False
     user_code = 'unkown'
     if 'user_code' in opt.pigeon:
@@ -227,12 +226,12 @@ def inference(model, opt, resdata):
     if 'in_threshold' in opt:
         in_threshold = opt.in_threshold
     strides = [5, 7, 9, 11, 13]
+    debug_mode = False
     if 'strides' in opt:
         strides = list(opt.strides)
         if strides[0] == -1: # TODO for debug
+            debug_mode = True
             strides = strides[1:]
-            osd_sims = True
-            best_stride_video = True
     constant_speed = False
     if 'constant_speed' in opt:
         constant_speed = opt.constant_speed
@@ -242,9 +241,6 @@ def inference(model, opt, resdata):
     fully_periodic = False
     if 'fully_periodic' in opt:
         fully_periodic = opt.fully_periodic
-    save_video = False
-    if 'save_video' in opt:
-        save_video = opt.save_video
     angle = None
     if 'angle' in opt:
         angle = opt.angle
@@ -254,15 +250,20 @@ def inference(model, opt, resdata):
     osd_feat = False
     if 'osd_feat' in opt:
         osd_feat = opt.osd_feat
+    osd_sims = True if debug_mode else False
     if 'osd_sims' in opt:
         osd_sims = opt.osd_sims
     temperature = 13.544
     if 'temperature' in opt:
         temperature = opt.temperature
     model.temperature = temperature
-    area_rate_thres = 0.002
+    area_rate_thres = 0.0002
     if 'area_rate_threshold' in opt:
         area_rate_thres = opt.area_rate_threshold
+    save_video = False
+    if 'save_video' in opt:
+        save_video = opt.save_video
+    best_stride_video = True if debug_mode else False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
 
@@ -270,14 +271,15 @@ def inference(model, opt, resdata):
     detect_focus, retrieve_count, box_size = False, 1, (10, 10)
     conf_thresh, iou_thresh = 0.5, 0.5
     focus_box, focus_box_repnum = None, 1
-    black_box, black_overlay = None, False
+    black_box, black_overlay = None, True if debug_mode else False
     if 'detect_focus' in opt:
         detect_focus = opt.detect_focus
     if not detect_focus:
         if 'focus_box' in opt:
             if 0 == opt.focus_box[0] and 0 == opt.focus_box[1] \
                     and 1 == opt.focus_box[2] and 1 == opt.focus_box[3]:
-                Logger.warning(f'error box: {opt.focus_box}')
+                # Logger.warning(f'error box: {opt.focus_box}')
+                pass
             else:
                 focus_box = opt.focus_box
         else:
@@ -288,12 +290,16 @@ def inference(model, opt, resdata):
                         (1 - w_rate) * 0.5, (1 - h_rate) * 0.5,
                         (1 + w_rate) * 0.5, (1 + h_rate) * 0.5,
                     ]
-        if 'black_box' in opt:
-            if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
-                    and 0 == opt.black_box[2] and 0 == opt.black_box[3]:
-                Logger.warning('error black box: {opt.black_box')
+        if 'block_box' in opt:
+            # if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
+            #         and 0 == opt.black_box[2] and 0 == opt.black_box[3]:
+            if 0 == opt.block_box[0] and 0 == opt.block_box[1] \
+                    and 0 == opt.block_box[2] and 0 == opt.block_box[3]:
+                # Logger.warning('error black box: {opt.block_box}')
+                pass
             else:
-                black_box = opt.black_box
+                # black_box = opt.black_box
+                black_box = opt.block_box
             if 'black_overlay' in opt:
                 black_overlay = opt['black_overlay']
     else:
@@ -623,6 +629,11 @@ def inference(model, opt, resdata):
         json_result['mkvideo_time'] = mkvid_time
         _video_save_progress(98)
 
+        if best_stride_video:
+            prefix_map = [h264_stride_file, '/'.join(opt.video[8:].split('/')[1:])]
+            race_object_put(osscli, h264_stride_file,
+                    bucket_name=bucketname, prefix_map=prefix_map)
+
     json_result_file = os.path.join(outdir, 'results.json')
     with open(json_result_file, 'w') as fw:
         fw.write(json.dumps(json_result, indent=4))
@@ -639,6 +650,7 @@ def inference(model, opt, resdata):
         prefix_map = [outdir, oss_path]
         race_object_put(osscli, outdir,
                 bucket_name=bucketname, prefix_map=prefix_map)
+
     _video_save_progress(100)
     resdata['progress'] = 100.0
     resdata['sumcnt'] = sum_counts[-1]
