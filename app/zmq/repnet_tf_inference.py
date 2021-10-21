@@ -629,7 +629,7 @@ def inference(model, opt, resdata):
         json_result['mkvideo_time'] = mkvid_time
         _video_save_progress(98)
 
-        if best_stride_video:
+        if debug_mode:
             prefix_map = [h264_stride_file, '/'.join(opt.video[8:].split('/')[1:])]
             race_object_put(osscli, h264_stride_file,
                     bucket_name=bucketname, prefix_map=prefix_map)
