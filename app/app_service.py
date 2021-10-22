@@ -10,7 +10,7 @@
 
 import json
 import argparse
-import raceai.runner # noqa
+# import raceai.runner # noqa
 import zmq
 import redis
 
@@ -182,6 +182,7 @@ if __name__ == "__main__":
         g_redis = redis.StrictRedis(args.redis_addr,
                 port=args.redis_port,
                 password=args.redis_passwd)
+        print(f'{args.redis_addr} {args.redis_port}')
     except Exception as err:
         app_logger('{}'.format(err))
     try:

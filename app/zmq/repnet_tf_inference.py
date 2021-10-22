@@ -342,7 +342,13 @@ def inference(model, opt, resdata):
             _report_result(msgkey, resdata, errcode=-10)
             Logger.warning('video url invalid: %s' % opt.video)
             return
-        video_file = race_data(opt.video.replace('s3.didiyunapi', 's3-internal.didiyunapi'))
+
+        try:
+            video_file = race_data(opt.video.replace('s3.didiyunapi', 's3-internal.didiyunapi'))
+        except Exception:
+            _report_result(msgkey, resdata, errcode=-11)
+            Logger.warning('video url invalid: %s' % opt.video)
+            return
 
         segs = uri.split('/')
         bucketname = segs[0].split('.')[0]
