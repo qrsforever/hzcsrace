@@ -342,13 +342,7 @@ def inference(model, opt, resdata):
             _report_result(msgkey, resdata, errcode=-10)
             Logger.warning('video url invalid: %s' % opt.video)
             return
-
-        try:
-            video_file = race_data(opt.video.replace('s3.didiyunapi', 's3-internal.didiyunapi'))
-        except Exception:
-            _report_result(msgkey, resdata, errcode=-11)
-            Logger.warning('video url invalid: %s' % opt.video)
-            return
+        video_file = race_data(opt.video.replace('s3.didiyunapi', 's3-internal.didiyunapi'))
 
         segs = uri.split('/')
         bucketname = segs[0].split('.')[0]
@@ -642,7 +636,11 @@ def inference(model, opt, resdata):
 
     json_result_file = os.path.join(outdir, 'results.json')
     with open(json_result_file, 'w') as fw:
-        fw.write(json.dumps(json_result, indent=4))
+        json.dump(json_result, fw, indent=4)
+
+    json_config_file = os.path.join(outdir, 'config.json')
+    with open(json_config_file, 'w') as fw:
+        json.dump('{}'.format(opt), fw, indent=4)
 
     del frames, still_frames, json_result, frames_info
     if osd_sims:
@@ -657,6 +655,7 @@ def inference(model, opt, resdata):
         race_object_put(osscli, outdir,
                 bucket_name=bucketname, prefix_map=prefix_map)
 
+    _video_save_progress(100)
     resdata['progress'] = 100.0
     resdata['sumcnt'] = sum_counts[-1]
     resdata['target_json'] = oss_domain + os.path.join(oss_path, os.path.basename(json_result_file))

@@ -22,7 +22,7 @@ __start_raceai()
 {
     docker run -dit --runtime nvidia --name ${NAME} \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
-        --network host \
+        --network host --restart unless-stopped \
         --env TOPIC=zmq.repnet_tf.inference \
         --env PYTHONPATH=/raceai/codes/app:/raceai/codes/projects/repnet-cli \
         --env TF_CPP_MIN_LOG_LEVEL=3 \

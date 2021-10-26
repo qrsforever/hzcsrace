@@ -10,7 +10,7 @@ CUR_FIL=${BASH_SOURCE[0]}
 TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 
 VENDOR=hzcsai_com
-PROJECT=raceai_app
+PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
 
 REDIS_ADDR=${REDIS_ADDR}
@@ -32,7 +32,7 @@ __start_raceai()
 {
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-app \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
-        --network host \
+        --network host --restart unless-stopped \
         --env REDIS_ADDR=${REDIS_ADDR} \
         --env REDIS_PORT=${REDIS_PORT} \
         --env REDIS_PSWD=${REDIS_PSWD} \
