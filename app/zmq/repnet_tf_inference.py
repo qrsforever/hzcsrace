@@ -290,16 +290,19 @@ def inference(model, opt, resdata):
                         (1 - w_rate) * 0.5, (1 - h_rate) * 0.5,
                         (1 + w_rate) * 0.5, (1 + h_rate) * 0.5,
                     ]
-        if 'block_box' in opt:
-            # if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
-            #         and 0 == opt.black_box[2] and 0 == opt.black_box[3]:
-            if 0 == opt.block_box[0] and 0 == opt.block_box[1] \
-                    and 0 == opt.block_box[2] and 0 == opt.block_box[3]:
-                # Logger.warning('error black box: {opt.block_box}')
-                pass
+        if 'block_box' in opt or 'black_box' in opt:
+            if 'black_box' in opt:
+                if 0 == opt.black_box[0] and 0 == opt.black_box[1] \
+                        and 0 == opt.black_box[2] and 0 == opt.black_box[3]:
+                    pass
+                else:
+                    black_box = opt.black_box
             else:
-                # black_box = opt.black_box
-                black_box = opt.block_box
+                if 0 == opt.block_box[0] and 0 == opt.block_box[1] \
+                        and 0 == opt.block_box[2] and 0 == opt.block_box[3]:
+                    pass
+                else:
+                    black_box = opt.block_box
             if 'black_overlay' in opt:
                 black_overlay = opt['black_overlay']
     else:
