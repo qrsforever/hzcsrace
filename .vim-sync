@@ -1,6 +1,6 @@
 #!/bin/bash
 
-remote_hostname='gamma102'
+remote_hostname='gamma103'
 remote_relative_path='workspace/codes/hzcsai_com/hzcsrace'
 
 cd $(dirname $0)

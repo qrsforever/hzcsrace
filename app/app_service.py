@@ -9,6 +9,7 @@
 
 
 import json
+import os
 import argparse
 # import raceai.runner # noqa
 import zmq
@@ -57,6 +58,8 @@ def _framework_inference():
     reqjson = json.loads(request.get_data().decode())
 
     #### debug
+    if not os.path.exist('/raceai/data/tmp'):
+        os.makedirs('/raceai/data/tmp')
     with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
         json.dump(reqjson, fw)
     ####

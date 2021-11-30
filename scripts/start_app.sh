@@ -10,7 +10,7 @@ CUR_FIL=${BASH_SOURCE[0]}
 TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 
 VENDOR=hzcsai_com
-PROJECT=raceai
+PROJECT=raceai_app
 REPOSITORY="$VENDOR/$PROJECT"
 
 REDIS_ADDR=${REDIS_ADDR}
