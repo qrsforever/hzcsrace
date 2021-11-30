@@ -224,7 +224,6 @@ class ResnetPeriodEstimator(tf.keras.models.Model):
 
         return x, within_period_x, final_embs
 
-    @tf.function
     def preprocess(self, imgs, cropped_box=None):
         imgs = tf.cast(imgs, tf.float32)
         imgs -= 127.5

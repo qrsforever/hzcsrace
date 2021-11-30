@@ -218,7 +218,7 @@ def inference(model, opt, resdata):
         user_code = opt.pigeon.user_code
     mac = opt.pigeon.get('mac_addr', None)
     if mac:
-        if mac == '00856405d389': # 切割
+        if mac == '00856405d389':
             opt.focus_box_repnum = 6
             opt.angle = 90
         elif mac == '00047dd87188':
@@ -226,6 +226,8 @@ def inference(model, opt, resdata):
             opt.angle = 90
         elif mac == '00232ee8876d':
             opt.focus_box_repnum = 3
+        elif mac == '002b359e3931':
+            opt.focus_box_repnum = 2
     batch_size = 20
     if 'batch_size' in opt:
         batch_size = opt.batch_size
@@ -495,7 +497,7 @@ def inference(model, opt, resdata):
     json_result['frames_period'] = frames_info
 
     if osd_sims:
-        # np.save('/raceai/data/tmp/repnet_embs.npy', final_embs)
+        np.save('/raceai/data/tmp/repnet_embs_2.npy', final_embs)
         embs_sims = get_sims(final_embs, temperature=temperature)
         embs_sims = np.squeeze(embs_sims, -1)
         Logger.info(f'embs_sims.shape: {embs_sims.shape}')
