@@ -302,10 +302,7 @@ def get_counts(model, frames, strides, batch_size,
         feature_maps = model.base_model.predict(chosen_frames)
     else:
         feature_maps = None
-
-    del frames, scores, within_period_scores_list, embs_list
-
-    if pred_score < threshold:
+del frames, scores, within_period_scores_list, embs_list if pred_score < threshold:
         print('No repetitions detected in video as score '
               '%0.2f is less than threshold %0.2f.' % (pred_score, threshold))
         per_frame_counts = np.asarray(len(per_frame_counts) * [0.])

@@ -216,6 +216,10 @@ def inference(model, opt, resdata):
     user_code = 'unkown'
     if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
+    mac = opt.pigeon.get('mac_addr', None)
+    if mac and mac == '00856405d389': # 切割
+        focus_box_repnum = 6
+        angle = 90
     batch_size = 20
     if 'batch_size' in opt:
         batch_size = opt.batch_size

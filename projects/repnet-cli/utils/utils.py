@@ -3,6 +3,7 @@ from tqdm import tqdm
 import cv2
 import numpy as np
 import requests
+import math
 import os
 
 DEBUG = False
@@ -39,7 +40,8 @@ def read_video(
         h = focus_y2 - focus_y1
     if rm_still: # remove still frames
         pre_frame = None
-        area_thres = area_rate_thres * w * h
+        area_thres = math.ceil(area_rate_thres * w * h)
+        print(f'rm_still: {area_thres} = ceil({area_rate_thres} * {w} * {h})')
     frames = []
     still_frames = []
 
