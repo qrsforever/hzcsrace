@@ -9,11 +9,14 @@ import tempfile
 import multiprocessing
 import requests
 import errno
+import ssl
 
 from urllib import request, parse
 from omegaconf.dictconfig import DictConfig
 from contextlib import contextmanager
 from raceai.utils.error import errmsg
+
+ssl._create_default_https_context = ssl._create_unverified_context
 
 DEBUG = False
 TEMPDIR = '/tmp/'
