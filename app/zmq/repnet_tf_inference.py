@@ -226,6 +226,7 @@ def inference(model, opt, resdata):
             opt.angle = 90
         elif mac == '00232ee8876d':
             opt.focus_box_repnum = 3
+            opt.reg_factor = 2
         elif mac == '002b359e3931':
             opt.focus_box_repnum = 2
     batch_size = 20
