@@ -232,7 +232,7 @@ def inference(model, opt, resdata):
         elif mac == '002b359e3931':
             opt.focus_box = [0.25, 0.05, 0.58, 0.99]
             opt.focus_box_repnum = 2
-    batch_size = 20
+    batch_size = 2
     if 'batch_size' in opt:
         batch_size = opt.batch_size
     threshold = 0.2
@@ -241,7 +241,7 @@ def inference(model, opt, resdata):
     in_threshold = 0.5
     if 'in_threshold' in opt:
         in_threshold = opt.in_threshold
-    strides = [5, 7, 9, 11, 13]
+    strides = [5, 7, 9]
     debug_mode = False
     if 'strides' in opt:
         strides = list(opt.strides)
@@ -258,7 +258,7 @@ def inference(model, opt, resdata):
     if 'fully_periodic' in opt:
         fully_periodic = opt.fully_periodic
     angle = None
-    if 'angle' in opt:
+    if 'angle' in opt and opt['angle'] != 0:
         angle = opt.angle
     reg_factor = None
     if 'reg_factor' in opt and opt['reg_factor'] != 1:
@@ -266,12 +266,6 @@ def inference(model, opt, resdata):
     rm_still = True
     if 'rm_still' in opt:
         rm_still = opt.rm_still
-    osd_feat = False
-    if 'osd_feat' in opt:
-        osd_feat = opt.osd_feat
-    osd_sims = True if debug_mode else False
-    if 'osd_sims' in opt:
-        osd_sims = opt.osd_sims
     temperature = 13.544
     if 'temperature' in opt:
         temperature = opt.temperature
@@ -285,6 +279,14 @@ def inference(model, opt, resdata):
     best_stride_video = True if debug_mode else False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
+    osd_feat = False
+    if 'osd_feat' in opt:
+        osd_feat = opt.osd_feat
+    osd_sims = True if debug_mode else False
+    if 'osd_sims' in opt:
+        osd_sims = opt.osd_sims
+    if osd_sims or osd_feat:
+        best_stride_video = True
 
     #### focus
     detect_focus, retrieve_count, box_size = False, 1, (10, 10)
@@ -349,7 +351,10 @@ def inference(model, opt, resdata):
         model_progress_weight = 0.68
 
     if msgkey[:2] == 'nb':
-        ts_token = '%d' % time.time()
+        if 'datasets/vod' in opt.video:
+            ts_token = msgkey
+        else:
+            ts_token = '%d' % time.time()
     else:
         ts_token = 'repnet_tf'
     outdir = os.path.join(main_args.out, user_code, ts_token)
@@ -501,7 +506,6 @@ def inference(model, opt, resdata):
     json_result['frames_period'] = frames_info
 
     if osd_sims:
-        np.save('/raceai/data/tmp/repnet_embs_2.npy', final_embs)
         embs_sims = get_sims(final_embs, temperature=temperature)
         embs_sims = np.squeeze(embs_sims, -1)
         Logger.info(f'embs_sims.shape: {embs_sims.shape}')
@@ -650,6 +654,7 @@ def inference(model, opt, resdata):
         _video_save_progress(96)
         if osd_sims:
             np.save(os.path.join(outdir, 'embs_sims.npy'), embs_sims)
+            resdata['embs_sims'] = oss_domain + os.path.join(oss_path, 'embs_sims.npy')
         mkvid_time = time.time() - s_time - infer_time
         json_result['mkvideo_time'] = mkvid_time
         _video_save_progress(98)

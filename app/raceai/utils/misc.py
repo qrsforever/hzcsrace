@@ -77,8 +77,12 @@ def race_convert_dictkeys(x, uppercase=True):
 def race_data(x):
     if x.startswith('http') or x.startswith('ftp'):
         x = parse.quote(x, safe=':/?-=')
-        r = request.urlretrieve(x, os.path.join('/raceai/data/tmp', os.path.basename(x)))
-        x = r[0]
+        for _ in range(5):
+            try:
+                r = request.urlretrieve(x, os.path.join('/raceai/data/tmp', os.path.basename(x)))
+                x = r[0]
+            except Exception:
+                time.sleep(1)
     elif x.startswith('oss://'):
         raise NotImplementedError('weight schema: oss')
     elif x.startswith('file://'):
