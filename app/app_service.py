@@ -58,7 +58,7 @@ def _framework_inference():
     reqjson = json.loads(request.get_data().decode())
 
     #### debug
-    if not os.path.exist('/raceai/data/tmp'):
+    if not os.path.exists('/raceai/data/tmp'):
         os.makedirs('/raceai/data/tmp')
     with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
         json.dump(reqjson, fw)
@@ -72,6 +72,7 @@ def _framework_inference():
         if isinstance(cfg, str):
             cfg = json.loads(cfg)
 
+        # app_logger(cfg)
         # TODO
         msgkey = cfg['pigeon']['msgkey']
         if msgkey[:2] == 'nb': # notebook call

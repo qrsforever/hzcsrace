@@ -2,6 +2,8 @@
 
 import os
 import sys
+import io
+import json
 import time
 import functools
 import importlib
@@ -248,3 +250,19 @@ def race_object_remove(client, remote_path, bucket_name=None):
             'bucket': obj.bucket_name,
             'object': obj.object_name,
             'size': obj.size})
+
+
+def race_object_put_jsonconfig(client, data, path, bucket_name=None):
+    if bucket_name is None:
+        bucket_name = 'raceai'
+    if isinstance(data, (dict, list)):
+        data = json.dumps(data, ensure_ascii=False, indent=4)
+    with io.BytesIO(data.encode()) as bio:
+        size = bio.seek(0, 2)
+        bio.seek(0, 0)
+        if path[0] == '/':
+            path = path[1:]
+        etag = client.put_object(bucket_name, path, bio, size, content_type='text/json')
+        if not isinstance(etag, str):
+            etag = etag.etag
+        return etag

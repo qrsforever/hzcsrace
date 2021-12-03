@@ -31,6 +31,7 @@ from raceai.utils.logger import (race_set_loglevel, race_set_logfile, Logger)
 from raceai.utils.misc import ( # noqa
         race_oss_client,
         race_object_put,
+        race_object_put_jsonconfig,
         race_object_remove,
         race_report_result,
         race_data)
@@ -376,6 +377,8 @@ def inference(model, opt, resdata):
         oss_domain = 'https://%s' % segs[0]
         if 's3-internal' in oss_domain:
             oss_domain = oss_domain.replace('s3-internal', 's3')
+
+        oss_path_counts = os.path.join('/', *segs[1:-2], 'counts')
         if msgkey[:2] == 'nb':
             oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], ts_token)
         else:
@@ -383,6 +386,7 @@ def inference(model, opt, resdata):
     else:
         oss_domain = 'file://'
         oss_path = '/tmp/debug/repent_tf'
+        oss_path_counts = '/tmp/debug/repent_tf_counts'
         video_file = opt.video
 
     def _detect_focus_progress(x):
@@ -664,13 +668,26 @@ def inference(model, opt, resdata):
             race_object_put(osscli, h264_stride_file,
                     bucket_name=bucketname, prefix_map=prefix_map)
 
+    resdata['sumcnt'] = round(float(sum_counts[-1]), 2)
+
     json_result_file = os.path.join(outdir, 'results.json')
     with open(json_result_file, 'w') as fw:
         json.dump(json_result, fw, indent=4)
 
     json_config_file = os.path.join(outdir, 'config.json')
     with open(json_config_file, 'w') as fw:
-        json.dump('{}'.format(opt), fw, indent=4)
+        opt.sumcnt = resdata['sumcnt']
+        json.dump(OmegaConf.to_container(opt), fw, indent=4)
+
+    # oss_path_counts
+    try:
+        ts = os.path.basename(opt.video)[:-4]
+        Logger.info(f'touch {oss_path_counts}/{ts}_{resdata["sumcnt"]}.json')
+        race_object_put_jsonconfig(
+                osscli, [], f'{oss_path_counts}/{ts}_{resdata["sumcnt"]}.json',
+                bucket_name=bucketname)
+    except Exception as err:
+        Logger.warning('%s' % err)
 
     del frames, still_frames, json_result, frames_info
     if osd_sims:
@@ -687,7 +704,6 @@ def inference(model, opt, resdata):
 
     _video_save_progress(100)
     resdata['progress'] = 100.0
-    resdata['sumcnt'] = sum_counts[-1]
     resdata['target_json'] = oss_domain + os.path.join(oss_path, os.path.basename(json_result_file))
     Logger.info(json.dumps(resdata))
     _report_result(msgkey, resdata)
@@ -699,6 +715,7 @@ if __name__ == "__main__":
     if _RELEASE_:
         zmqsub.subscribe(main_args.topic)
         race_report_result('add_topic', main_args.topic)
+        Logger.info('main_args.topic: %s' % main_args.topic)
 
     os.system('rm /tmp/*.mp4 2>/dev/null')
     os.system('rm /tmp/tmp*.py 2>/dev/null')
