@@ -220,19 +220,22 @@ def inference(model, opt, resdata):
     mac = opt.pigeon.get('mac_addr', None)
     if mac:
         if mac == '00856405d389':
-            # opt.focus_box = [0.448, 0.39, 0.53, 0.54]
             opt.focus_box = [0.448, 0.41, 0.53, 0.54]
             opt.focus_box_repnum = 6
+            opt.area_rate_threshold = 0.01
             opt.angle = 90
         elif mac == '00047dd87188':
             opt.focus_box_repnum = 2
+            opt.area_rate_threshold = 0.01
             opt.angle = 90
         elif mac == '00232ee8876d':
+            opt.area_rate_threshold = 0.002
             opt.focus_box = [0.45, 0.5, 0.65, 0.75]
             opt.focus_box_repnum = 3
             opt.reg_factor = 2
         elif mac == '002b359e3931':
             opt.focus_box = [0.25, 0.05, 0.58, 0.99]
+            opt.area_rate_threshold = 0.01
             opt.focus_box_repnum = 2
     batch_size = 2
     if 'batch_size' in opt:
