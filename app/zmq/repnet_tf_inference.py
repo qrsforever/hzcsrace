@@ -220,7 +220,8 @@ def inference(model, opt, resdata):
     mac = opt.pigeon.get('mac_addr', None)
     if mac:
         if mac == '00856405d389':
-            opt.focus_box = [0.448, 0.39, 0.53, 0.54]
+            # opt.focus_box = [0.448, 0.39, 0.53, 0.54]
+            opt.focus_box = [0.448, 0.41, 0.53, 0.54]
             opt.focus_box_repnum = 6
             opt.angle = 90
         elif mac == '00047dd87188':
@@ -352,10 +353,7 @@ def inference(model, opt, resdata):
         model_progress_weight = 0.68
 
     if msgkey[:2] == 'nb':
-        if 'datasets/vod' in opt.video:
-            ts_token = msgkey
-        else:
-            ts_token = '%d' % time.time()
+        ts_token = '%d' % time.time()
     else:
         ts_token = 'repnet_tf'
     outdir = os.path.join(main_args.out, user_code, ts_token)
