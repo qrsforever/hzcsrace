@@ -749,11 +749,11 @@ if __name__ == "__main__":
                     _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99)
                     os.system('rm /tmp/*.mp4 2>/dev/null')
                     os.system('rm /tmp/tmp*.py 2>/dev/null')
-                time.sleep(0.01)
                 if zmq_cfg.pigeon.msgkey[:2] == 'nb':
                     race_report_result('zmp_end', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}')
                 else:
                     race_report_result('zmp_end', main_args.topic)
+                time.sleep(0.01)
         else:
             zmq_cfg = {
                     "pigeon": {"msgkey": "123", "user_code": "123"},
