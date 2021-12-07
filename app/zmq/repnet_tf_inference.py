@@ -703,7 +703,7 @@ def inference(model, opt, resdata):
         race_object_put(osscli, outdir,
                 bucket_name=bucketname, prefix_map=prefix_map)
 
-    _video_save_progress(100)
+    # _video_save_progress(100)
     resdata['progress'] = 100.0
     resdata['target_json'] = oss_domain + os.path.join(oss_path, os.path.basename(json_result_file))
     Logger.info(json.dumps(resdata))
