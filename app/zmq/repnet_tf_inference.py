@@ -511,9 +511,11 @@ def inference(model, opt, resdata):
     json_result['frames_period'] = frames_info
 
     if osd_sims:
+        np.save(os.path.join(outdir, 'embs_feat.npy'), final_embs)
+        resdata['embs_feat'] = oss_domain + os.path.join(oss_path, 'embs_feat.npy')
         embs_sims = get_sims(final_embs, temperature=temperature)
         embs_sims = np.squeeze(embs_sims, -1)
-        Logger.info(f'embs_sims.shape: {embs_sims.shape}')
+        Logger.info(f'embs_feat.shape: {final_embs.shape}  embs_sims.shape: {embs_sims.shape}')
 
     detect_box = None
     if detect_focus and detinfo:
