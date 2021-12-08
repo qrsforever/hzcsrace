@@ -567,8 +567,8 @@ def inference(model, opt, resdata):
                             '%d,%d' % (bx2, by2),
                             (bx2 - 65, by2 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (210, 210, 210), 1)
-                cv2.rectangle(frame_bgr, (0, 0), (width, th), (0, 0, 0), -1)
-                cv2.rectangle(frame_bgr, (0, height - th), (width, height), (0, 0, 0), -1)
+                # cv2.rectangle(frame_bgr, (0, 0), (width, th), (0, 0, 0), -1)
+                # cv2.rectangle(frame_bgr, (0, height - th), (width, height), (0, 0, 0), -1)
                 try:
                     if osd_sims and not is_still_frames[idx] \
                             and valid_idx % (chosen_stride * model.num_frames) == 0:
@@ -580,7 +580,7 @@ def inference(model, opt, resdata):
                         #         0, frame_bgr)
                         osd += 1
                     if osd_blend is not None:
-                        frame_bgr[:osd_size, width - osd_size:, :] = osd_blend
+                        frame_bgr[th:osd_size + th, width - osd_size:, :] = osd_blend
                 except Exception as err:
                     Logger.info(err)
                     Logger.error(traceback.format_exc(limit=3))
