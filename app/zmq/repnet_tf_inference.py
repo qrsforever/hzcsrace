@@ -512,9 +512,11 @@ def inference(model, opt, resdata):
     json_result['frames_period'] = frames_info
 
     if osd_sims:
+        np.save(os.path.join(outdir, 'embs_feat.npy'), final_embs)
+        resdata['embs_feat'] = oss_domain + os.path.join(oss_path, 'embs_feat.npy')
         embs_sims = get_sims(final_embs, temperature=temperature)
         embs_sims = np.squeeze(embs_sims, -1)
-        Logger.info(f'embs_sims.shape: {embs_sims.shape}')
+        Logger.info(f'embs_feat.shape: {final_embs.shape}  embs_sims.shape: {embs_sims.shape}')
 
     detect_box = None
     if detect_focus and detinfo:
@@ -704,7 +706,7 @@ def inference(model, opt, resdata):
         race_object_put(osscli, outdir,
                 bucket_name=bucketname, prefix_map=prefix_map)
 
-    _video_save_progress(100)
+    # _video_save_progress(100)
     resdata['progress'] = 100.0
     resdata['target_json'] = oss_domain + os.path.join(oss_path, os.path.basename(json_result_file))
     Logger.info(json.dumps(resdata))
@@ -750,11 +752,11 @@ if __name__ == "__main__":
                     _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99)
                     os.system('rm /tmp/*.mp4 2>/dev/null')
                     os.system('rm /tmp/tmp*.py 2>/dev/null')
-                time.sleep(0.01)
                 if zmq_cfg.pigeon.msgkey[:2] == 'nb':
                     race_report_result('zmp_end', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}')
                 else:
                     race_report_result('zmp_end', main_args.topic)
+                time.sleep(0.01)
         else:
             zmq_cfg = {
                     "pigeon": {"msgkey": "123", "user_code": "123"},

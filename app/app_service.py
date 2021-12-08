@@ -58,10 +58,10 @@ def _framework_inference():
     reqjson = json.loads(request.get_data().decode())
 
     #### debug
-    if not os.path.exists('/raceai/data/tmp'):
-        os.makedirs('/raceai/data/tmp')
-    with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
-        json.dump(reqjson, fw)
+    # if not os.path.exists('/raceai/data/tmp'):
+    #     os.makedirs('/raceai/data/tmp')
+    # with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
+    #     json.dump(reqjson, fw)
     ####
 
     if reqjson['task'].startswith('zmq'):
@@ -76,14 +76,23 @@ def _framework_inference():
         # TODO
         msgkey = cfg['pigeon']['msgkey']
         if msgkey[:2] == 'nb': # notebook call
-            res = g_redis.get(f'{reqjson["task"]}_{msgkey}')
+            task_topic = f'{reqjson["task"]}_{msgkey}'
         else:
-            res = g_redis.get(reqjson['task'])
-        if res and res.decode() == '1':
-            return json.dumps({'errno': -3})
-        g_redis.delete(msgkey)
-
-        zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(cfg, separators=(',',':'))))
+            task_topic = reqjson['task']
+        for i in range(3):
+            res = g_redis.get(task_topic)
+            if res is None or res.decode() != '1':
+                break
+            if i == 2:
+                app_logger('error: task already run.')
+                return json.dumps({'errno': -3})
+            time.sleep(0.3)
+        try:
+            g_redis.delete(msgkey)
+            zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(cfg, separators=(',',':'))))
+        except:
+            app_logger('error: task run error.')
+            return json.dumps({'errno': -4})
         return json.dumps({'errno': 0})
 
     cfg = OmegaConf.create(reqjson['cfg'])
