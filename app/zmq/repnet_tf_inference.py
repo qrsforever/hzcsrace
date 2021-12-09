@@ -225,9 +225,10 @@ def inference(model, opt, resdata):
             opt.area_rate_threshold = 0.01
             opt.angle = 90
         elif mac == '00047dd87188':
-            opt.focus_box = [0.346, 0.152, 0.518, 0.925]
+            opt.focus_box = [0.346, 0.15, 0.6, 0.95]
             opt.focus_box_repnum = 2
-            opt.area_rate_threshold = 0.01
+            opt.area_rate_threshold = 0.1
+            opt.strides = [2, 4]
             opt.angle = 90
         elif mac == '00232ee8876d':
             opt.area_rate_threshold = 0.002
