@@ -237,8 +237,9 @@ def inference(model, opt, resdata):
             opt.focus_box_repnum = 3
             opt.reg_factor = 2
         elif mac == '002b359e3931':
-            opt.focus_box = [0.25, 0.05, 0.58, 0.99]
-            opt.area_rate_threshold = 0.01
+            opt.focus_box = [0.25, 0.05, 0.59, 0.99]
+            opt.area_rate_threshold = 0.1
+            opt.strides = [2]
             opt.focus_box_repnum = 2
     batch_size = 2
     if 'batch_size' in opt:
