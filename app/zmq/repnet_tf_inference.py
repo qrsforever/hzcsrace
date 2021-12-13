@@ -59,10 +59,12 @@ input_width = 112
 input_height = 112
 
 
-def _report_result(msgkey, resdata, errcode=0):
+def _report_result(msgkey, resdata, errcode=0, errtxt=None):
     if _RELEASE_:
         if errcode < 0:
             resdata['errno'] = errcode
+            if errtxt:
+                resdata['errtxt'] = errtxt
             resdata['progress'] = 100
         race_report_result(msgkey, resdata)
         if msgkey[:2] == 'nb':
@@ -431,13 +433,14 @@ def inference(model, opt, resdata):
                 progress_cb=_video_read_progress,
                 rm_still=rm_still, area_rate_thres=area_rate_thres)
     except Exception:
-        _report_result(msgkey, resdata, errcode=-20)
+        errtxt = traceback.format_exc(limit=3)
+        _report_result(msgkey, resdata, errcode=-20, errtxt=errtxt)
         Logger.warning('read video error: %s' % opt.video)
-        Logger.error(traceback.format_exc(limit=3))
+        Logger.error(errtxt)
         os.remove(video_file)
         return
     if len(frames) <= 64:
-        _report_result(msgkey, resdata, errcode=-21)
+        _report_result(msgkey, resdata, errcode=-21, errtxt='video valid frames[%d] < 64' % len(frames))
         Logger.warning('read video error: %s num_frames[%d]' % (opt.video, len(frames)))
         os.remove(video_file)
         return
@@ -478,7 +481,7 @@ def inference(model, opt, resdata):
             final_per_frame_counts[k] = per_frame_counts[i]
             i += 1
         else:
-            _report_result(msgkey, resdata, errcode=-30)
+            _report_result(msgkey, resdata, errcode=-30, errtxt='frames count invalid')
             Logger.warning('frames count invalid: %d vs %d vs %d' % (i, j, k))
             os.remove(video_file)
             return
@@ -749,10 +752,11 @@ if __name__ == "__main__":
                     inference(repnet_model, zmq_cfg, resdata)
                 except Exception as err:
                     if 'OOM' in str(err):
-                        _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-9)
+                        _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-9, errtxt='OOM')
                         raise err
-                    Logger.error(traceback.format_exc(limit=3))
-                    _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99)
+                    errtxt = traceback.format_exc(limit=3)
+                    Logger.error(errtxt)
+                    _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99, errtxt=errtxt)
                     os.system('rm /tmp/*.mp4 2>/dev/null')
                     os.system('rm /tmp/tmp*.py 2>/dev/null')
                 if zmq_cfg.pigeon.msgkey[:2] == 'nb':

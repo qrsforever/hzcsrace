@@ -9,7 +9,9 @@
 
 
 import json
-import os
+import traceback
+import os # noqa
+import time
 import argparse
 # import raceai.runner # noqa
 import zmq
@@ -85,14 +87,17 @@ def _framework_inference():
                 break
             if i == 2:
                 app_logger('error: task already run.')
-                return json.dumps({'errno': -3})
+                return json.dumps({'errno': -3, 'errtxt': 'task already run'})
             time.sleep(0.3)
         try:
+            len = g_redis.llen(msgkey)
+            if len > 0:
+                app_logger(f'error: redis key {msgkey} length is not 0: {len}')
             g_redis.delete(msgkey)
             zmqpub.send_string('%s %s' % (reqjson['task'], json.dumps(cfg, separators=(',',':'))))
-        except:
+        except Exception:
             app_logger('error: task run error.')
-            return json.dumps({'errno': -4})
+            return json.dumps({'errno': -4, 'errtxt': traceback.format_exc(limit=3)})
         return json.dumps({'errno': 0})
 
     cfg = OmegaConf.create(reqjson['cfg'])
