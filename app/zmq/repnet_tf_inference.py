@@ -366,7 +366,7 @@ def inference(model, opt, resdata):
     else:
         ts_token = 'repnet_tf'
     outdir = os.path.join(main_args.out, user_code, ts_token)
-    shutil.rmtree(outdir, ignore_errors=True)
+    shutil.rmtree(main_args.out, ignore_errors=True)
     os.makedirs(outdir, exist_ok=True)
 
     # parse path info
@@ -433,7 +433,7 @@ def inference(model, opt, resdata):
                 progress_cb=_video_read_progress,
                 rm_still=rm_still, area_rate_thres=area_rate_thres)
     except Exception:
-        errtxt = traceback.format_exc(limit=3)
+        errtxt = traceback.format_exc(limit=6)
         _report_result(msgkey, resdata, errcode=-20, errtxt=errtxt)
         Logger.warning('read video error: %s' % opt.video)
         Logger.error(errtxt)
@@ -589,7 +589,7 @@ def inference(model, opt, resdata):
                         frame_bgr[th:osd_size + th, width - osd_size:, :] = osd_blend
                 except Exception as err:
                     Logger.info(err)
-                    Logger.error(traceback.format_exc(limit=3))
+                    Logger.error(traceback.format_exc(limit=6))
                 cv2.putText(frame_bgr,
                         '%dX%d %.1f S:%d C:%.1f/%.1f T:%.3f %s' % (width, height,
                             fps, chosen_stride, sum_counts[idx], sum_counts[-1],
@@ -754,7 +754,7 @@ if __name__ == "__main__":
                     if 'OOM' in str(err):
                         _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-9, errtxt='OOM')
                         raise err
-                    errtxt = traceback.format_exc(limit=3)
+                    errtxt = traceback.format_exc(limit=6)
                     Logger.error(errtxt)
                     _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99, errtxt=errtxt)
                     os.system('rm /tmp/*.mp4 2>/dev/null')
@@ -777,7 +777,7 @@ if __name__ == "__main__":
             inference(repnet_model, zmq_cfg)
     except Exception as err:
         Logger.error(err)
-        Logger.error(traceback.format_exc(limit=3))
+        Logger.error(traceback.format_exc(limit=6))
 
     finally:
         if _RELEASE_:

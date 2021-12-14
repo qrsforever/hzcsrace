@@ -4,8 +4,22 @@ from scipy.signal import medfilt
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import matplotlib
-
 from repnet import ResnetPeriodEstimator
+
+from scipy import stats
+import pickle
+
+ksw = pickle.load(open('/ckpts/ks.pkl', 'rb'))
+
+ks_thresh = sum(ksw['pca'].explained_variance_ratio_) / 2
+
+
+def empirical_kstest(test, alpha=0.01):
+    print('1111111111111111111111111111111111111111111', test.shape)
+    pca = ksw['pca']
+    ecdfs = ksw['ecdf']
+    pvals = np.array([stats.kstest(test[:, i], cdf=lambda x: ecdfs[i](x))[1] for i in range(test.shape[-1])])
+    return sum(pca.explained_variance_ratio_[pvals > alpha])
 
 
 def get_repnet_model(logdir):
@@ -250,6 +264,20 @@ def get_counts(model, frames, strides, batch_size,
     chosen_stride = strides[argmax_strides]
     raw_scores = np.repeat(
         raw_scores_list[argmax_strides], chosen_stride, axis=0)[:seq_len]
+
+    final_embs = embs_list[argmax_strides]
+
+    # QRS
+    # factors = np.ones(len(final_embs))
+    # for i in range(len(final_embs)):
+    #     emb = final_embs[i]
+    #     print('-----------', i, emb.shape)
+    #     ksret = empirical_kstest(emb)
+    #     if ksret < ks_thresh:
+    #         factors[i] = ksret / ks_thresh
+    # print('-------:', ksret, factors, within_period_scores_list[argmax_strides].shape)
+    # factors = factors.repeat(64)
+
     within_period = np.repeat(
         within_period_scores_list[argmax_strides], chosen_stride,
         axis=0)[:seq_len]
@@ -257,12 +285,10 @@ def get_counts(model, frames, strides, batch_size,
     if median_filter:
         within_period_binary = medfilt(within_period_binary, 5)
 
-    final_embs = embs_list[argmax_strides]
-
-    # Select Periodic frames
-    periodic_idxes = np.where(within_period_binary)[0]
-
     if constant_speed:
+        # Select Periodic frames
+        periodic_idxes = np.where(within_period_binary)[0]
+
         # Count by averaging predictions. Smoother but
         # assumes constant speed.
         scores = tf.reduce_mean(
@@ -288,12 +314,12 @@ def get_counts(model, frames, strides, batch_size,
 
         per_frame_counts *= np.asarray(within_period_binary)
 
-        # QRS
-        cnts = np.sum(per_frame_counts)
-        if cnts > 0:
-            pred_period = seq_len / np.sum(per_frame_counts)
-        else:
-            pred_period = seq_len * 0.0
+    # QRS
+    cnts = np.sum(per_frame_counts)
+    if cnts > 0:
+        pred_period = seq_len / np.sum(per_frame_counts)
+    else:
+        pred_period = seq_len * 0.0
 
     # feature map
     if osd_feat:
