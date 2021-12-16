@@ -7,18 +7,11 @@ import matplotlib
 from repnet import ResnetPeriodEstimator
 
 from scipy import stats
-import pickle
-
-ksw = pickle.load(open('/ckpts/ks.pkl', 'rb'))
-
-ks_thresh = sum(ksw['pca'].explained_variance_ratio_) / 2
 
 
-def empirical_kstest(test, alpha=0.01):
-    print('1111111111111111111111111111111111111111111', test.shape)
-    pca = ksw['pca']
-    ecdfs = ksw['ecdf']
-    pvals = np.array([stats.kstest(test[:, i], cdf=lambda x: ecdfs[i](x))[1] for i in range(test.shape[-1])])
+def empirical_kstest(emb, scaler, pca, ecdfs, alpha=0.01):
+    out = pca.transform(scaler.transform(emb))
+    pvals = np.array([stats.kstest(out[:, i], cdf=lambda x: ecdfs[i](x))[1] for i in range(out.shape[-1])])
     return sum(pca.explained_variance_ratio_[pvals > alpha])
 
 
@@ -213,7 +206,7 @@ def get_counts(model, frames, strides, batch_size,
                within_period_threshold,
                constant_speed=False,
                median_filter=False,
-               fully_periodic=False, osd_feat=False, progress_cb=None):
+               fully_periodic=False, osd_feat=False, pcaks=None, progress_cb=None):
     """Pass frames through model and conver period predictions to count."""
     seq_len = len(frames)
     raw_scores_list = []
@@ -268,18 +261,25 @@ def get_counts(model, frames, strides, batch_size,
     final_embs = embs_list[argmax_strides]
 
     # QRS
-    # factors = np.ones(len(final_embs))
-    # for i in range(len(final_embs)):
-    #     emb = final_embs[i]
-    #     print('-----------', i, emb.shape)
-    #     ksret = empirical_kstest(emb)
-    #     if ksret < ks_thresh:
-    #         factors[i] = ksret / ks_thresh
-    # print('-------:', ksret, factors, within_period_scores_list[argmax_strides].shape)
-    # factors = factors.repeat(64)
+    within_period_scores = within_period_scores_list[argmax_strides]
+    if pcaks:
+        ks_thresh = sum(pcaks['pca'].explained_variance_ratio_) / 2
+        scaler = pcaks['scaler']
+        pca = pcaks['pca']
+        ecdfs = pcaks['ecdf']
+        alpha = pcaks.get('alpha', 0.01)
+        beta = pcaks.get('beta', 0.7)
+        factors = np.ones(len(final_embs))
+        for i in range(len(final_embs)):
+            emb = final_embs[i]
+            ksret = empirical_kstest(emb, scaler, pca, ecdfs, alpha)
+            if ksret < ks_thresh:
+                factors[i] = beta * ksret / ks_thresh
+        factors = factors.repeat(64)
+        within_period_scores *= factors
 
     within_period = np.repeat(
-        within_period_scores_list[argmax_strides], chosen_stride,
+        within_period_scores, chosen_stride,
         axis=0)[:seq_len]
     within_period_binary = np.asarray(within_period > within_period_threshold)
     if median_filter:

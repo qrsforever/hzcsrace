@@ -94,7 +94,7 @@ def read_video(
                 # frame_rgb = cv2.rotate(frame_rgb, rot)
                 M = cv2.getRotationMatrix2D(center=(int(width / 2), int(height / 2)), angle=rot, scale=1.0)
                 frame_rgb = cv2.warpAffine(frame_rgb, M, (width, height))
-            if rm_still and not keep_flag:
+            if frame_idx and rm_still and not keep_flag:
                 still_frames.append((frame_idx, frame_rgb))
             else:
                 frames.append(frame_rgb)

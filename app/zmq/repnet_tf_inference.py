@@ -14,6 +14,7 @@ import shutil
 import numpy as np
 import cv2
 import traceback
+import pickle
 
 import matplotlib.pyplot as plt
 import io
@@ -58,6 +59,8 @@ ffmpeg_args = '-preset ultrafast -vcodec libx264 -pix_fmt yuv420p'
 input_width = 112
 input_height = 112
 
+pcaks_ckpts_path = '/ckpts/pcaks'
+
 
 def _report_result(msgkey, resdata, errcode=0, errtxt=None):
     if _RELEASE_:
@@ -68,9 +71,9 @@ def _report_result(msgkey, resdata, errcode=0, errtxt=None):
             resdata['progress'] = 100
         race_report_result(msgkey, resdata)
         if msgkey[:2] == 'nb':
-            race_report_result('zmp_run', f'{main_args.topic}_{msgkey}:220')
+            race_report_result('zmp_run', f'{main_args.topic}_{msgkey}:10')
         else:
-            race_report_result('zmp_run', f'{main_args.topic}:220')
+            race_report_result('zmp_run', f'{main_args.topic}:10')
     else:
         pass
 
@@ -262,12 +265,15 @@ def inference(model, opt, resdata):
     constant_speed = False
     if 'constant_speed' in opt:
         constant_speed = opt.constant_speed
-    median_filter = True
-    if 'median_filter' in opt:
-        median_filter = opt.median_filter
     fully_periodic = False
     if 'fully_periodic' in opt:
         fully_periodic = opt.fully_periodic
+    median_filter = True
+    if 'median_filter' in opt:
+        median_filter = opt.median_filter
+    embs_filter_path = None
+    if 'ef_url' in opt:
+        embs_filter_path = opt.ef_url
     angle = None
     if 'angle' in opt and opt['angle'] != 0:
         angle = opt.angle
@@ -390,6 +396,17 @@ def inference(model, opt, resdata):
             oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], ts_token)
         else:
             oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
+
+        pcaks = None
+        if embs_filter_path:
+            epath = os.path.join(pcaks_ckpts_path, os.path.basename(embs_filter_path))
+            if not os.path.exists(epath):
+                epath = race_data(embs_filter_path.replace('s3.didiyunapi', 's3-internal.didiyunapi'), pcaks_ckpts_path)
+            pcaks = pickle.load(open(epath, 'rb'))
+            if 'ef_alpha' in opt:
+                pcaks['alpha'] = opt.ef_alpha
+            if 'ef_beta' in opt:
+                pcaks['beta'] = opt.ef_beta
     else:
         oss_domain = 'file://'
         oss_path = '/tmp/debug/repent_tf'
@@ -440,10 +457,11 @@ def inference(model, opt, resdata):
         os.remove(video_file)
         return
     if len(frames) <= 64:
-        _report_result(msgkey, resdata, errcode=-21, errtxt='video valid frames[%d] < 64' % len(frames))
+        # TODO
         Logger.warning('read video error: %s num_frames[%d]' % (opt.video, len(frames)))
-        os.remove(video_file)
-        return
+        # _report_result(msgkey, resdata, errcode=-21, errtxt='video valid frames[%d] < 64' % len(frames))
+        # os.remove(video_file)
+        # return
 
     _report_result(msgkey, resdata)
 
@@ -462,6 +480,7 @@ def inference(model, opt, resdata):
             median_filter=median_filter,
             fully_periodic=fully_periodic,
             osd_feat=osd_feat,
+            pcaks=pcaks,
             progress_cb=_model_strides_progress)
     infer_time = time.time() - s_time
     Logger.info('model inference using time: %d, chosen_stride:%d' % (infer_time, chosen_stride))
@@ -584,6 +603,19 @@ def inference(model, opt, resdata):
                         #         osd_blend, alpha,
                         #         frame_bgr[:osd_size, width - osd_size:, :], 1 - alpha,
                         #         0, frame_bgr)
+                        if pcaks:
+                            cv2.putText(osd_blend,
+                                    '%.3f %.3f' % (pcaks['alpha'], pcaks['beta']),
+                                    (int(0.1 * osd_size), int(0.2 * osd_size)),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.6,
+                                    (255, 0, 0), 1)
+                        cv2.putText(osd_blend,
+                                '%d' % osd,
+                                (int(0.4 * osd_size), int(0.6 * osd_size)),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                1,
+                                (255, 255, 255), 2)
                         osd += 1
                     if osd_blend is not None:
                         frame_bgr[th:osd_size + th, width - osd_size:, :] = osd_blend
@@ -598,6 +630,7 @@ def inference(model, opt, resdata):
                         cv2.FONT_HERSHEY_SIMPLEX,
                         0.7 if height < 500 else 2,
                         (255, 255, 255), 2)
+
                 if focus_box is not None:
                     cv2.putText(frame_bgr,
                             '%d,%d' % (fx1, fy1),
@@ -745,9 +778,9 @@ if __name__ == "__main__":
                 Logger.info(zmq_cfg.pigeon)
                 resdata = {'pigeon': dict(zmq_cfg.pigeon), 'task': main_args.topic, 'errno': 0}
                 if zmq_cfg.pigeon.msgkey[:2] == 'nb':
-                    race_report_result('zmp_run', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}:30')
+                    race_report_result('zmp_run', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}:5')
                 else:
-                    race_report_result('zmp_run', f'{main_args.topic}:30')
+                    race_report_result('zmp_run', f'{main_args.topic}:5')
                 try:
                     inference(repnet_model, zmq_cfg, resdata)
                 except Exception as err:
