@@ -222,31 +222,7 @@ def inference(model, opt, resdata):
     user_code = 'unkown'
     if 'user_code' in opt.pigeon:
         user_code = opt.pigeon.user_code
-    mac = opt.pigeon.get('mac_addr', None)
-    if mac:
-        if mac == '00856405d389':
-            opt.focus_box = [0.41, 0.35, 0.5, 0.5]
-            opt.focus_box_repnum = 6
-            opt.area_rate_threshold = 0.1
-            opt.strides = [1]
-            opt.angle = 90
-        elif mac == '00047dd87188':
-            opt.focus_box = [0.346, 0.15, 0.6, 0.95]
-            opt.focus_box_repnum = 2
-            opt.area_rate_threshold = 0.1
-            opt.strides = [2, 4]
-            opt.angle = 90
-        elif mac == '00232ee8876d':
-            opt.area_rate_threshold = 0.002
-            opt.focus_box = [0.45, 0.5, 0.65, 0.75]
-            opt.focus_box_repnum = 3
-            opt.reg_factor = 2
-        elif mac == '002b359e3931':
-            opt.focus_box = [0.25, 0.05, 0.59, 0.99]
-            opt.area_rate_threshold = 0.1
-            opt.strides = [2]
-            opt.focus_box_repnum = 2
-    batch_size = 2
+    batch_size = 1
     if 'batch_size' in opt:
         batch_size = opt.batch_size
     threshold = 0.2
@@ -256,12 +232,8 @@ def inference(model, opt, resdata):
     if 'in_threshold' in opt:
         in_threshold = opt.in_threshold
     strides = [5, 7, 9]
-    debug_mode = False
     if 'strides' in opt:
         strides = list(opt.strides)
-        if strides[0] == -1: # TODO for debug
-            debug_mode = True
-            strides = strides[1:]
     constant_speed = False
     if 'constant_speed' in opt:
         constant_speed = opt.constant_speed
@@ -293,13 +265,13 @@ def inference(model, opt, resdata):
     save_video = False
     if 'save_video' in opt:
         save_video = opt.save_video
-    best_stride_video = True if debug_mode else False
+    best_stride_video = False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
     osd_feat = False
     if 'osd_feat' in opt:
         osd_feat = opt.osd_feat
-    osd_sims = True if debug_mode else False
+    osd_sims = False
     if 'osd_sims' in opt:
         osd_sims = opt.osd_sims
     if osd_sims or osd_feat:
@@ -309,7 +281,7 @@ def inference(model, opt, resdata):
     detect_focus, retrieve_count, box_size = False, 1, (10, 10)
     conf_thresh, iou_thresh = 0.5, 0.5
     focus_box, focus_box_repnum = None, 1
-    black_box, black_overlay = None, True if debug_mode else False
+    black_box, black_overlay = None, False
     if 'detect_focus' in opt:
         detect_focus = opt.detect_focus
     if not detect_focus:
@@ -706,21 +678,17 @@ def inference(model, opt, resdata):
         json_result['mkvideo_time'] = mkvid_time
         _video_save_progress(98)
 
-        if debug_mode:
-            prefix_map = [h264_stride_file, '/'.join(opt.video[8:].split('/')[1:])]
-            race_object_put(osscli, h264_stride_file,
-                    bucket_name=bucketname, prefix_map=prefix_map)
-
     resdata['sumcnt'] = round(float(sum_counts[-1]), 2)
 
     json_result_file = os.path.join(outdir, 'results.json')
     with open(json_result_file, 'w') as fw:
         json.dump(json_result, fw, indent=4)
 
-    json_config_file = os.path.join(outdir, 'config.json')
-    with open(json_config_file, 'w') as fw:
-        opt.sumcnt = resdata['sumcnt']
-        json.dump(OmegaConf.to_container(opt), fw, indent=4)
+    if msgkey[:2] != 'nb':
+        json_config_file = os.path.join(outdir, 'config.json')
+        with open(json_config_file, 'w') as fw:
+            opt.sumcnt = resdata['sumcnt']
+            json.dump(OmegaConf.to_container(opt), fw, indent=4)
 
     # oss_path_counts
     try:

@@ -185,7 +185,8 @@ class ResnetPeriodEstimator(tf.keras.models.Model):
                                         self.temporal_conv_layers):
             x = conv_layer(x)
             x = bn_layer(x)
-            x = tf.nn.elu(x)
+            # x = tf.nn.elu(x)
+            x = tf.nn.relu(x)
 
         x = tf.reduce_max(x, [2, 3])
 

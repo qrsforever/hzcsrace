@@ -81,13 +81,14 @@ def _framework_inference():
             task_topic = f'{reqjson["task"]}_{msgkey}'
         else:
             task_topic = reqjson['task']
-        for i in range(3):
+        for i in range(5):
             res = g_redis.get(task_topic)
             if res is None or res.decode() != '1':
                 break
-            if i == 2:
+            if i == 4:
                 app_logger('error: task already run.')
-                return json.dumps({'errno': -3, 'errtxt': 'task already run'})
+                g_redis.delete(task_topic)
+                # return json.dumps({'errno': -3, 'errtxt': 'task already run'})
             time.sleep(0.3)
         try:
             len = g_redis.llen(msgkey)

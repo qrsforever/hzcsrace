@@ -266,7 +266,7 @@ def get_counts(model, frames, strides, batch_size,
         ks_thresh = sum(pcaks['pca'].explained_variance_ratio_) / 2
         scaler = pcaks['scaler']
         pca = pcaks['pca']
-        ecdfs = pcaks['ecdf']
+        ecdfs = pcaks['ecdfs']
         alpha = pcaks.get('alpha', 0.01)
         beta = pcaks.get('beta', 0.7)
         factors = np.ones(len(final_embs))
