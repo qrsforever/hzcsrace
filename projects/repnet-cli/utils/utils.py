@@ -28,7 +28,7 @@ def read_video(
     fps = cap.get(cv2.CAP_PROP_FPS)
 
     n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    pbar = tqdm(total=n_frames, desc=f"Getting frames from {video_filename} {len ...")
+    pbar = tqdm(total=n_frames, desc=f"Getting frames from {video_filename} {len} ...")
 
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
