@@ -274,8 +274,8 @@ def inference(model, opt, resdata):
     osd_sims = False
     if 'osd_sims' in opt:
         osd_sims = opt.osd_sims
-    if osd_sims or osd_feat:
-        best_stride_video = True
+    # if osd_sims or osd_feat:
+    #     best_stride_video = True
 
     #### focus
     detect_focus, retrieve_count, box_size = False, 1, (10, 10)
@@ -429,11 +429,12 @@ def inference(model, opt, resdata):
         os.remove(video_file)
         return
     if len(frames) <= 64:
+        if len(frames) == 0:
+            _report_result(msgkey, resdata, errcode=-21, errtxt='video valid frames is 0')
+            os.remove(video_file)
+            return
         # TODO
         Logger.warning('read video error: %s num_frames[%d]' % (opt.video, len(frames)))
-        # _report_result(msgkey, resdata, errcode=-21, errtxt='video valid frames[%d] < 64' % len(frames))
-        # os.remove(video_file)
-        # return
 
     _report_result(msgkey, resdata)
 
