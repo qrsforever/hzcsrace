@@ -101,11 +101,10 @@ def read_video(
                 if DEBUG:
                     debug_vid.write(frame_bgr)
 
-            frame_idx += 1
-
             if progress_cb:
                 if frame_idx % 100 == 0:
                     progress_cb((100 * float(frame_idx)) / n_frames)
+            frame_idx += 1
 
             del frame_bgr
 
