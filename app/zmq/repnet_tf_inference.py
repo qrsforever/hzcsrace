@@ -40,7 +40,6 @@ from raceai.utils.misc import ( # noqa
 race_set_loglevel('info')
 race_set_logfile('/tmp/raceai-repnet_tf.log')
 
-_RELEASE_ = True
 context = zmq.Context()
 zmqsub = context.socket(zmq.SUB)
 zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
@@ -63,19 +62,16 @@ pcaks_ckpts_path = '/ckpts/pcaks'
 
 
 def _report_result(msgkey, resdata, errcode=0, errtxt=None):
-    if _RELEASE_:
-        if errcode < 0:
-            resdata['errno'] = errcode
-            if errtxt:
-                resdata['errtxt'] = errtxt
-            resdata['progress'] = 100
-        race_report_result(msgkey, resdata)
-        if msgkey[:2] == 'nb':
-            race_report_result('zmp_run', f'{main_args.topic}_{msgkey}:10')
-        else:
-            race_report_result('zmp_run', f'{main_args.topic}:10')
+    if errcode < 0:
+        resdata['errno'] = errcode
+        if errtxt:
+            resdata['errtxt'] = errtxt
+        resdata['progress'] = 100
+    race_report_result(msgkey, resdata)
+    if msgkey[:2] == 'nb':
+        race_report_result('zmp_run', f'{main_args.topic}_{msgkey}:10')
     else:
-        pass
+        race_report_result('zmp_run', f'{main_args.topic}:10')
 
 
 def _detect_focus(msgkey, vfile, retrieve_count, conf_thresh, iou_thresh, box_size, progress_cb):
@@ -268,14 +264,12 @@ def inference(model, opt, resdata):
     best_stride_video = False
     if 'best_stride_video' in opt:
         best_stride_video = opt.best_stride_video
-    osd_feat = False
-    if 'osd_feat' in opt:
-        osd_feat = opt.osd_feat
-    osd_sims = False
-    if 'osd_sims' in opt:
-        osd_sims = opt.osd_sims
-    # if osd_sims or osd_feat:
-    #     best_stride_video = True
+    osd_feat, osd_sims = False, False
+    if best_stride_video or save_video:
+        if 'osd_feat' in opt:
+            osd_feat = opt.osd_feat
+        if 'osd_sims' in opt:
+            osd_sims = opt.osd_sims
 
     #### focus
     detect_focus, retrieve_count, box_size = False, 1, (10, 10)
@@ -348,42 +342,35 @@ def inference(model, opt, resdata):
     os.makedirs(outdir, exist_ok=True)
 
     # parse path info
-    if _RELEASE_:
-        if 'https://' in opt.video and 'didiyunapi.com' in opt.video:
-            uri = opt.video[8:]
-        else:
-            _report_result(msgkey, resdata, errcode=-10)
-            Logger.warning('video url invalid: %s' % opt.video)
-            return
-        video_file = race_data(opt.video.replace('s3.didiyunapi', 's3-internal.didiyunapi'))
-
-        segs = uri.split('/')
-        bucketname = segs[0].split('.')[0]
-        oss_domain = 'https://%s' % segs[0]
-        if 's3-internal' in oss_domain:
-            oss_domain = oss_domain.replace('s3-internal', 's3')
-
-        oss_path_counts = os.path.join('/', *segs[1:-2], 'counts')
-        if msgkey[:2] == 'nb':
-            oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], ts_token)
-        else:
-            oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
-
-        pcaks = None
-        if embs_filter_path:
-            epath = os.path.join(pcaks_ckpts_path, os.path.basename(embs_filter_path))
-            if not os.path.exists(epath):
-                epath = race_data(embs_filter_path.replace('s3.didiyunapi', 's3-internal.didiyunapi'), pcaks_ckpts_path)
-            pcaks = pickle.load(open(epath, 'rb'))
-            if 'ef_alpha' in opt:
-                pcaks['alpha'] = opt.ef_alpha
-            if 'ef_beta' in opt:
-                pcaks['beta'] = opt.ef_beta
+    if 'https://' in opt.video and 'didiyunapi.com' in opt.video:
+        uri = opt.video[8:]
     else:
-        oss_domain = 'file://'
-        oss_path = '/tmp/debug/repent_tf'
-        oss_path_counts = '/tmp/debug/repent_tf_counts'
-        video_file = opt.video
+        _report_result(msgkey, resdata, errcode=-10)
+        Logger.warning('video url invalid: %s' % opt.video)
+        return
+    video_file = race_data(opt.video.replace('s3.didiyunapi', 's3-internal.didiyunapi'))
+
+    segs = uri.split('/')
+    bucketname = segs[0].split('.')[0]
+    oss_domain = 'https://%s' % segs[0]
+    if 's3-internal' in oss_domain:
+        oss_domain = oss_domain.replace('s3-internal', 's3')
+
+    oss_path_counts = os.path.join('/', *segs[1:-2], 'counts')
+    if msgkey[:2] == 'nb':
+        oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], ts_token)
+    else:
+        oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
+
+    pcaks = None
+    if embs_filter_path:
+        epath = os.path.join(pcaks_ckpts_path, os.path.basename(embs_filter_path))
+        if not os.path.exists(epath):
+            epath = race_data(embs_filter_path.replace('s3.didiyunapi', 's3-internal.didiyunapi'), pcaks_ckpts_path)
+        pcaks = pickle.load(open(epath, 'rb'))
+        pcaks['alpha'] = opt.ef_alpha if 'ef_alpha' in opt else 0.01
+        pcaks['beta'] = opt.ef_beta if 'ef_beta' in opt else 0.5
+        pcaks['gamma'] = opt.ef_gamma if 'ef_gamma' in opt else 0.7
 
     def _detect_focus_progress(x):
         resdata['progress'] = round(x * 0.1, 2)
@@ -442,7 +429,7 @@ def inference(model, opt, resdata):
 
     (pred_period, pred_score,
             within_period, per_frame_counts,
-            chosen_stride, final_embs, feature_maps) = get_counts(
+            chosen_stride, final_embs, feature_maps, feat_factors) = get_counts(
             model,
             frames,
             strides=strides,
@@ -578,17 +565,23 @@ def inference(model, opt, resdata):
                         #         0, frame_bgr)
                         if pcaks:
                             cv2.putText(osd_blend,
-                                    '%.3f %.3f' % (pcaks['alpha'], pcaks['beta']),
-                                    (int(0.1 * osd_size), int(0.2 * osd_size)),
+                                    '%.2f %.2f %.2f' % (pcaks['alpha'], pcaks['beta'], pcaks['gamma']),
+                                    (int(0.05 * osd_size), int(0.2 * osd_size)),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.6,
+                                    (255, 0, 0), 1)
+                            cv2.putText(osd_blend,
+                                    '%.2f %.2f' % (feat_factors[osd][0], feat_factors[osd][1]),
+                                    (int(0.05 * osd_size), int(0.85 * osd_size)),
                                     cv2.FONT_HERSHEY_SIMPLEX,
                                     0.6,
                                     (255, 0, 0), 1)
                         cv2.putText(osd_blend,
                                 '%d' % osd,
-                                (int(0.4 * osd_size), int(0.6 * osd_size)),
+                                (int(0.4 * osd_size), int(0.55 * osd_size)),
                                 cv2.FONT_HERSHEY_SIMPLEX,
                                 1,
-                                (255, 255, 255), 2)
+                                (255, 0, 0), 2)
                         osd += 1
                     if osd_blend is not None:
                         frame_bgr[th:osd_size + th, width - osd_size:, :] = osd_blend
@@ -701,18 +694,10 @@ def inference(model, opt, resdata):
     except Exception as err:
         Logger.warning('%s' % err)
 
-    del frames, still_frames, json_result, frames_info
-    if osd_sims:
-        del embs_sims
-    if osd_feat:
-        del feature_maps
-    os.remove(video_file)
-
-    if _RELEASE_:
-        race_object_remove(osscli, outdir[1:] + '/', bucket_name=bucketname)
-        prefix_map = [outdir, oss_path]
-        race_object_put(osscli, outdir,
-                bucket_name=bucketname, prefix_map=prefix_map)
+    race_object_remove(osscli, outdir[1:] + '/', bucket_name=bucketname)
+    prefix_map = [outdir, oss_path]
+    race_object_put(osscli, outdir,
+            bucket_name=bucketname, prefix_map=prefix_map)
 
     # _video_save_progress(100)
     resdata['progress'] = 100.0
@@ -720,14 +705,21 @@ def inference(model, opt, resdata):
     Logger.info(json.dumps(resdata))
     _report_result(msgkey, resdata)
 
+    del frames, still_frames, json_result, frames_info
+    if pcaks:
+        del feat_factors 
+    if osd_sims:
+        del embs_sims
+    if osd_feat:
+        del feature_maps
+    os.remove(video_file)
     del resdata
 
 
 if __name__ == "__main__":
-    if _RELEASE_:
-        zmqsub.subscribe(main_args.topic)
-        race_report_result('add_topic', main_args.topic)
-        Logger.info('main_args.topic: %s' % main_args.topic)
+    zmqsub.subscribe(main_args.topic)
+    race_report_result('add_topic', main_args.topic)
+    Logger.info('main_args.topic: %s' % main_args.topic)
 
     os.system('rm /tmp/*.mp4 2>/dev/null')
     os.system('rm /tmp/tmp*.py 2>/dev/null')
@@ -736,52 +728,37 @@ if __name__ == "__main__":
         # Load model
         repnet_model = get_model(main_args.ckpt)
 
-        if _RELEASE_:
-            while True:
-                Logger.info('wait task')
-                zmq_cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
-                zmq_cfg = OmegaConf.create(zmq_cfg)
-                Logger.info(zmq_cfg)
-                if 'pigeon' not in zmq_cfg:
-                    continue
-                Logger.info(zmq_cfg.pigeon)
-                resdata = {'pigeon': dict(zmq_cfg.pigeon), 'task': main_args.topic, 'errno': 0}
-                if zmq_cfg.pigeon.msgkey[:2] == 'nb':
-                    race_report_result('zmp_run', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}:5')
-                else:
-                    race_report_result('zmp_run', f'{main_args.topic}:5')
-                try:
-                    inference(repnet_model, zmq_cfg, resdata)
-                except Exception as err:
-                    if 'OOM' in str(err):
-                        _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-9, errtxt='OOM')
-                        raise err
-                    errtxt = traceback.format_exc(limit=6)
-                    Logger.error(errtxt)
-                    _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99, errtxt=errtxt)
-                    os.system('rm /tmp/*.mp4 2>/dev/null')
-                    os.system('rm /tmp/tmp*.py 2>/dev/null')
-                if zmq_cfg.pigeon.msgkey[:2] == 'nb':
-                    race_report_result('zmp_end', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}')
-                else:
-                    race_report_result('zmp_end', main_args.topic)
-                time.sleep(0.01)
-        else:
-            zmq_cfg = {
-                    "pigeon": {"msgkey": "123", "user_code": "123"},
-                    "video": main_args.path,
-                    'save_video': False
-            }
-            # "video": "https://raceai.s3.didiyunapi.com/data/media/videos/repnet_test.mp4"
+        while True:
+            Logger.info('wait task')
+            zmq_cfg = ''.join(zmqsub.recv_string().split(' ')[1:])
             zmq_cfg = OmegaConf.create(zmq_cfg)
             Logger.info(zmq_cfg)
-            resdata = {'pigeon': zmq_cfg['pigeon'], 'task': main_args.topic, 'errno': 0}
-            inference(repnet_model, zmq_cfg)
+            if 'pigeon' not in zmq_cfg:
+                continue
+            Logger.info(zmq_cfg.pigeon)
+            resdata = {'pigeon': dict(zmq_cfg.pigeon), 'task': main_args.topic, 'errno': 0}
+            if zmq_cfg.pigeon.msgkey[:2] == 'nb':
+                race_report_result('zmp_run', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}:5')
+            else:
+                race_report_result('zmp_run', f'{main_args.topic}:5')
+            try:
+                inference(repnet_model, zmq_cfg, resdata)
+            except Exception as err:
+                if 'OOM' in str(err):
+                    _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-9, errtxt='OOM')
+                    raise err
+                errtxt = traceback.format_exc(limit=6)
+                Logger.error(errtxt)
+                _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-99, errtxt=errtxt)
+                os.system('rm /tmp/*.mp4 2>/dev/null')
+                os.system('rm /tmp/tmp*.py 2>/dev/null')
+            if zmq_cfg.pigeon.msgkey[:2] == 'nb':
+                race_report_result('zmp_end', f'{main_args.topic}_{zmq_cfg.pigeon.msgkey}')
+            else:
+                race_report_result('zmp_end', main_args.topic)
+            time.sleep(0.01)
     except Exception as err:
         Logger.error(err)
         Logger.error(traceback.format_exc(limit=6))
-
     finally:
-        if _RELEASE_:
-            race_report_result('del_topic', main_args.topic)
         Logger.info('end')

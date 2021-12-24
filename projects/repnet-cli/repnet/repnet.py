@@ -1,9 +1,7 @@
 import numpy as np
+import time
 import tensorflow as tf
 from scipy.signal import medfilt
-from matplotlib.animation import FuncAnimation
-import matplotlib.pyplot as plt
-import matplotlib
 from repnet import ResnetPeriodEstimator
 
 from scipy import stats
@@ -219,11 +217,16 @@ def get_counts(model, frames, strides, batch_size,
 
     frames = model.preprocess(frames)
 
-    for i, stride in enumerate(strides, 1):
+    Fprg = 1.0
+    if pcaks:
+        Fprg = 0.5
+
+    for i, stride in enumerate(strides):
         num_batches = int(np.ceil(seq_len / model.num_frames / stride / batch_size))
         raw_scores_per_stride = []
         within_period_score_stride = []
         embs_stride = []
+        Nprg = num_batches * len(strides)
         for batch_idx in range(num_batches):
             idxes = tf.range(batch_idx * batch_size * model.num_frames * stride,
                     (batch_idx + 1) * batch_size * model.num_frames * stride,
@@ -240,8 +243,8 @@ def get_counts(model, frames, strides, batch_size,
             within_period_score_stride.append(np.reshape(within_period_scores.numpy(),
                                                          [-1, 1]))
             embs_stride.append(embs)
-        if progress_cb:
-            progress_cb((100 * float(i)) / len(strides))
+            if progress_cb:
+                progress_cb((100 * Fprg * float(i * num_batches + batch_idx + 1)) / Nprg)
         raw_scores_per_stride = np.concatenate(raw_scores_per_stride, axis=0)
         raw_scores_list.append(raw_scores_per_stride)
         within_period_score_stride = np.concatenate(
@@ -262,21 +265,27 @@ def get_counts(model, frames, strides, batch_size,
 
     # QRS
     within_period_scores = within_period_scores_list[argmax_strides]
+    feat_factors = []
     if pcaks:
-        ks_thresh = sum(pcaks['pca'].explained_variance_ratio_) / 2
+        start_time = time.time()
+        factors = np.ones(len(final_embs))
         scaler = pcaks['scaler']
         pca = pcaks['pca']
         ecdfs = pcaks['ecdfs']
         alpha = pcaks.get('alpha', 0.01)
-        beta = pcaks.get('beta', 0.7)
-        factors = np.ones(len(final_embs))
+        beta = pcaks.get('beta', 0.5)
+        gamma = pcaks.get('gamma', 0.7)
+        ks_thresh = beta * sum(pcaks['pca'].explained_variance_ratio_)
         for i in range(len(final_embs)):
             emb = final_embs[i]
             ksret = empirical_kstest(emb, scaler, pca, ecdfs, alpha)
             if ksret < ks_thresh:
-                factors[i] = beta * ksret / ks_thresh
-        factors = factors.repeat(64)
-        within_period_scores *= factors
+                factors[i] = round(gamma * ksret / ks_thresh, 2)
+            feat_factors.append((ksret, factors[i]))
+            if progress_cb:
+                progress_cb(100 * Fprg * (1 + float(i + 1) / len(final_embs)))
+        within_period_scores *= factors.repeat(64)
+        print('pcakstest time: %d secs' % (time.time() - start_time))
 
     within_period = np.repeat(
         within_period_scores, chosen_stride,
@@ -337,7 +346,7 @@ def get_counts(model, frames, strides, batch_size,
         per_frame_counts = np.asarray(len(per_frame_counts) * [0.])
 
     return (pred_period, pred_score, within_period,
-            per_frame_counts, chosen_stride, final_embs, feature_maps)
+            per_frame_counts, chosen_stride, final_embs, feature_maps, feat_factors)
 
 
 def get_score(period_score, within_period_score):
@@ -352,124 +361,3 @@ def get_score(period_score, within_period_score):
     within_period_score = np.sqrt(within_period_score)
     pred_score = tf.reduce_mean(within_period_score)
     return pred_score, within_period_score
-
-
-def viz_reps(frames,
-             count,
-             score,
-             output_file,
-             alpha=1.0,
-             pichart=True,
-             colormap=plt.cm.PuBu,
-             num_frames=None,
-             interval=30,
-             plot_score=True,
-             progress_cb=None):
-
-    """Visualize repetitions."""
-    if isinstance(count, list):
-        counts = len(frames) * [count / len(frames)]
-    else:
-        counts = count
-    sum_counts = np.cumsum(counts)
-    fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(5, 5),
-                           tight_layout=True, )
-
-    h, w, _ = np.shape(frames[0])
-    wedge_x = 95 / 112 * w
-    wedge_y = 17 / 112 * h
-    wedge_r = 15 / 112 * h
-    txt_x = 95 / 112 * w
-    txt_y = 19 / 112 * h
-    otxt_size = 62 / 112 * h
-
-    if plot_score:
-        plt.title('Score:%.2f' % score, fontsize=20)
-    im0 = ax.imshow(unnorm(frames[0]))
-
-    if not num_frames:
-        num_frames = len(frames)
-
-    if pichart:
-        wedge1 = matplotlib.patches.Wedge(
-            center=(wedge_x, wedge_y),
-            r=wedge_r,
-            theta1=0,
-            theta2=0,
-            color=colormap(1.),
-            alpha=alpha)
-        wedge2 = matplotlib.patches.Wedge(
-            center=(wedge_x, wedge_y),
-            r=wedge_r,
-            theta1=0,
-            theta2=0,
-            color=colormap(0.5),
-            alpha=alpha)
-
-        ax.add_patch(wedge1)
-        ax.add_patch(wedge2)
-        txt = ax.text(
-            txt_x,
-            txt_y,
-            '0',
-            size=35,
-            ha='center',
-            va='center',
-            alpha=0.9,
-            color='white',
-        )
-
-    else:
-        txt = ax.text(
-            txt_x,
-            txt_y,
-            '0',
-            size=otxt_size,
-            ha='center',
-            va='center',
-            alpha=0.8,
-            color=colormap(0.4),
-        )
-
-    def update(i):
-        """Update plot with next frame."""
-        im0.set_data(unnorm(frames[i]))
-        ctr = int(sum_counts[i])
-        if pichart:
-            if ctr % 2 == 0:
-                wedge1.set_color(colormap(1.0))
-                wedge2.set_color(colormap(0.5))
-            else:
-                wedge1.set_color(colormap(0.5))
-                wedge2.set_color(colormap(1.0))
-
-            wedge1.set_theta1(-90)
-            wedge1.set_theta2(-90 - 360 * (1 - sum_counts[i] % 1.0))
-            wedge2.set_theta1(-90 - 360 * (1 - sum_counts[i] % 1.0))
-            wedge2.set_theta2(-90)
-
-        txt.set_text(int(sum_counts[i]))
-        ax.grid(False)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        plt.tight_layout()
-
-        if progress_cb:
-            if i % 100 == 0:
-                progress_cb(round((100 * float(i)) / num_frames, 2))
-
-    anim = FuncAnimation(
-        fig,
-        update,
-        frames=num_frames,
-        interval=interval,
-        blit=False)
-
-    # final_count = np.around(np.sum(counts)).astype(np.int)
-
-    if output_file[-3:] == 'mp4':
-        anim.save(output_file, dpi=100, fps=None)
-    elif output_file[-3:] == 'gif':
-        anim.save(output_file, writer='imagemagick', fps=None, dpi=100)
-
-    plt.close()
