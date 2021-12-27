@@ -84,6 +84,10 @@ do
             --custom_classifier /ckpts \
             --outdir /outputs
             ;;
+        "pcaks")
+            python3 zmq/pcaks_test.py \
+                --topic ${TOPIC}
+            ;;
         *)
             echo "SS_MODULE set error"
             break;;
