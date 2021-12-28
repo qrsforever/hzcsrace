@@ -778,7 +778,7 @@ def pcaks_test(opt, resdata):
             prefix_map = [tmp_dir, os.path.dirname(oss_path)]
             race_object_put(osscli, tmp_dir,
                     bucket_name=bucketname, prefix_map=prefix_map)
-            resdata['embs_feat'] = f'https://{segs[0]}{oss_path}'
+            resdata['pcaks'] = f'https://{segs[0]}{oss_path}'
     _report_result(msgkey, resdata)
 
 
