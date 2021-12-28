@@ -28,7 +28,6 @@ from sklearn import preprocessing
 import itertools 
 import scipy.signal as signal
 from statsmodels.distributions.empirical_distribution import ECDF
-import pickle
 import hashlib
 
 import io

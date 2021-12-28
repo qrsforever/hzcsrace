@@ -15,6 +15,7 @@ import numpy as np
 import cv2
 import traceback
 import pickle
+import tempfile
 
 import matplotlib.pyplot as plt
 import io
@@ -43,6 +44,11 @@ race_set_logfile('/tmp/raceai-repnet_tf.log')
 context = zmq.Context()
 zmqsub = context.socket(zmq.SUB)
 zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
+
+from sklearn.decomposition import PCA
+from sklearn import preprocessing
+from statsmodels.distributions.empirical_distribution import ECDF
+
 
 osscli = race_oss_client()
 
@@ -333,10 +339,7 @@ def inference(model, opt, resdata):
     else:
         model_progress_weight = 0.68
 
-    if msgkey[:2] == 'nb':
-        ts_token = '%d' % time.time()
-    else:
-        ts_token = 'repnet_tf'
+    ts_token = 'repnet_tf'
     outdir = os.path.join(main_args.out, user_code, ts_token)
     shutil.rmtree(main_args.out, ignore_errors=True)
     os.makedirs(outdir, exist_ok=True)
@@ -357,10 +360,7 @@ def inference(model, opt, resdata):
         oss_domain = oss_domain.replace('s3-internal', 's3')
 
     oss_path_counts = os.path.join('/', *segs[1:-2], 'counts')
-    if msgkey[:2] == 'nb':
-        oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], ts_token)
-    else:
-        oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], 'repnet_tf')
+    oss_path = os.path.join('/', *segs[1:-2], 'outputs', segs[-1].split('.')[0], ts_token)
 
     pcaks = None
     if embs_filter_path:
@@ -525,10 +525,15 @@ def inference(model, opt, resdata):
             h264_stride_file = os.path.join(outdir, 'target-stride.mp4')
             stride_vid = cv2.VideoWriter(mp4v_stride_file, fmt, fps, (width, height))
 
-        if black_box is not None:
-            bx1, by1, bx2, by2 = cal_rect_points(width, height, black_box)
-        if focus_box is not None:
-            fx1, fy1, fx2, fy2 = cal_rect_points(width, height, focus_box)
+        if osd_sims:
+            if black_box is not None:
+                bx1, by1, bx2, by2 = cal_rect_points(width, height, black_box)
+            if focus_box is not None:
+                fx1, fy1, fx2, fy2 = cal_rect_points(width, height, focus_box)
+        else:
+            black_box = None
+            focus_box = None
+
         if cap.isOpened():
             cur_db = None
             idx, valid_idx = 0, 0
@@ -699,7 +704,6 @@ def inference(model, opt, resdata):
     race_object_put(osscli, outdir,
             bucket_name=bucketname, prefix_map=prefix_map)
 
-    # _video_save_progress(100)
     resdata['progress'] = 100.0
     resdata['target_json'] = oss_domain + os.path.join(oss_path, os.path.basename(json_result_file))
     Logger.info(json.dumps(resdata))
@@ -707,13 +711,75 @@ def inference(model, opt, resdata):
 
     del frames, still_frames, json_result, frames_info
     if pcaks:
-        del feat_factors 
+        del feat_factors
     if osd_sims:
         del embs_sims
     if osd_feat:
         del feature_maps
     os.remove(video_file)
     del resdata
+
+
+def pcaks_test(opt, resdata):
+    Logger.info(opt)
+    msgkey = opt.pigeon.msgkey
+    remote_path = 'https://frepai.s3.didiyunapi.com/datasets/embs_feat.npy'
+    if 'out_path' in opt.pigeon:
+        remote_path = opt.pigeon.out_path
+
+    segs = remote_path[8:].split('/')
+    bucketname = segs[0].split('.')[0]
+    oss_path = os.path.join('/', *segs[1:])
+
+    nc = opt.n_components
+    sc = opt.scaler
+    pca = PCA(n_components=nc)
+
+    if sc == 'Normalizer':
+        scaler = preprocessing.Normalizer()
+    elif sc == 'Standard':
+        scaler = preprocessing.StandardScaler()
+    elif sc == 'MinMax':
+        scaler = preprocessing.MinMaxScaler()
+    elif sc == 'Robust':
+        scaler = preprocessing.RobustScaler(quantile_range=(25., 75.))
+    else:
+        scaler = preprocessing.Normalizer()
+
+    # datasets
+    feat_list = []
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        for item in opt.pcaks:
+            epath = race_data(item['ef_url'].replace('s3.didiyunapi', 's3-internal.didiyunapi'), tmp_dir)
+            if os.path.exists(epath):
+                efnpy = np.load(epath)
+                if efnpy.shape[0] > max(item['slices']):
+                    feat_list.append(efnpy[item['slices']])
+                else:
+                    Logger.error(f'nfnpy.shape[0] ({efnpy.shape}) < max_slices ({max(item["slices"])})')
+
+    feat_np = np.concatenate(feat_list, axis=0).reshape((-1, 512))
+    Logger.info(f'feat_np.shape: {feat_np.shape}')
+
+    scaler.fit(feat_np)
+    data_out = pca.fit_transform(scaler.transform(feat_np))
+
+    ecdfs = [ECDF(sample) for sample in data_out.T]
+
+    pcaks = {
+        'pca': pca,
+        'scaler': scaler,
+        'ecdfs': ecdfs,
+    }
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        with open(f'{tmp_dir}/{os.path.basename(oss_path)}', 'wb') as fw:
+            pickle.dump(pcaks, fw)
+            prefix_map = [tmp_dir, os.path.dirname(oss_path)]
+            race_object_put(osscli, tmp_dir,
+                    bucket_name=bucketname, prefix_map=prefix_map)
+            resdata['embs_feat'] = f'https://{segs[0]}{oss_path}'
+    _report_result(msgkey, resdata)
 
 
 if __name__ == "__main__":
@@ -742,7 +808,10 @@ if __name__ == "__main__":
             else:
                 race_report_result('zmp_run', f'{main_args.topic}:5')
             try:
-                inference(repnet_model, zmq_cfg, resdata)
+                if 'pcaks' in zmq_cfg:
+                    pcaks_test(zmq_cfg, resdata)
+                else:
+                    inference(repnet_model, zmq_cfg, resdata)
             except Exception as err:
                 if 'OOM' in str(err):
                     _report_result(zmq_cfg.pigeon.msgkey, resdata, errcode=-9, errtxt='OOM')
