@@ -20,6 +20,7 @@ import tempfile
 import matplotlib.pyplot as plt
 import io
 import requests
+import tensorflow_probability as tfp
 
 from collections import Counter
 from sklearn.cluster import KMeans
@@ -47,7 +48,6 @@ zmqsub.connect('tcp://{}:{}'.format('0.0.0.0', 5555))
 
 from sklearn.decomposition import PCA
 from sklearn import preprocessing
-from statsmodels.distributions.empirical_distribution import ECDF
 
 
 osscli = race_oss_client()
@@ -364,13 +364,12 @@ def inference(model, opt, resdata):
 
     pcaks = None
     if embs_filter_path:
-        epath = os.path.join(pcaks_ckpts_path, os.path.basename(embs_filter_path))
-        if not os.path.exists(epath):
-            epath = race_data(embs_filter_path.replace('s3.didiyunapi', 's3-internal.didiyunapi'), pcaks_ckpts_path)
-        pcaks = pickle.load(open(epath, 'rb'))
-        pcaks['alpha'] = opt.ef_alpha if 'ef_alpha' in opt else 0.01
-        pcaks['beta'] = opt.ef_beta if 'ef_beta' in opt else 0.5
-        pcaks['gamma'] = opt.ef_gamma if 'ef_gamma' in opt else 0.7
+        epath = race_data(embs_filter_path.replace('s3.didiyunapi', 's3-internal.didiyunapi'), pcaks_ckpts_path)
+        with open(epath, 'rb') as fr:
+            pcaks = pickle.load(fr)
+            pcaks['alpha'] = opt.ef_alpha if 'ef_alpha' in opt else 0.01
+            pcaks['beta'] = opt.ef_beta if 'ef_beta' in opt else 0.5
+            pcaks['gamma'] = opt.ef_gamma if 'ef_gamma' in opt else 0.7
 
     def _detect_focus_progress(x):
         resdata['progress'] = round(x * 0.1, 2)
@@ -721,6 +720,8 @@ def inference(model, opt, resdata):
 
 
 def pcaks_test(opt, resdata):
+    # from statsmodels.distributions.empirical_distribution import ECDF # noqa
+
     Logger.info(opt)
     msgkey = opt.pigeon.msgkey
     remote_path = 'https://frepai.s3.didiyunapi.com/datasets/embs_feat.npy'
@@ -764,7 +765,8 @@ def pcaks_test(opt, resdata):
     scaler.fit(feat_np)
     data_out = pca.fit_transform(scaler.transform(feat_np))
 
-    ecdfs = [ECDF(sample) for sample in data_out.T]
+    # ecdfs = [ECDF(sample) for sample in data_out.T]
+    ecdfs = tfp.distributions.Empirical(data_out.T)
 
     pcaks = {
         'pca': pca,
@@ -775,10 +777,10 @@ def pcaks_test(opt, resdata):
     with tempfile.TemporaryDirectory() as tmp_dir:
         with open(f'{tmp_dir}/{os.path.basename(oss_path)}', 'wb') as fw:
             pickle.dump(pcaks, fw)
-            prefix_map = [tmp_dir, os.path.dirname(oss_path)]
-            race_object_put(osscli, tmp_dir,
-                    bucket_name=bucketname, prefix_map=prefix_map)
-            resdata['pcaks'] = f'https://{segs[0]}{oss_path}'
+        prefix_map = [tmp_dir, os.path.dirname(oss_path)]
+        race_object_put(osscli, tmp_dir,
+                bucket_name=bucketname, prefix_map=prefix_map)
+        resdata['pcaks'] = f'https://{segs[0]}{oss_path}'
     _report_result(msgkey, resdata)
 
 

@@ -7,8 +7,15 @@ from repnet import ResnetPeriodEstimator
 from scipy import stats
 
 
+N = 64
+
+CDF0 = (np.arange(0, N) / N).reshape((-1, 1))
+CDF1 = (np.arange(1.0, N + 1) / N).reshape((-1, 1))
+
+
 def empirical_kstest(emb, scaler, pca, ecdfs, alpha=0.01):
     out = pca.transform(scaler.transform(emb))
+    # pvals = np.array([stats.kstest(out[:, i], cdf=lambda x: ecdfs[i](x))[1] for i in range(out.shape[-1])])
     pvals = np.array([stats.kstest(out[:, i], cdf=lambda x: ecdfs[i](x))[1] for i in range(out.shape[-1])])
     return sum(pca.explained_variance_ratio_[pvals > alpha])
 
@@ -275,15 +282,40 @@ def get_counts(model, frames, strides, batch_size,
         alpha = pcaks.get('alpha', 0.01)
         beta = pcaks.get('beta', 0.5)
         gamma = pcaks.get('gamma', 0.7)
-        ks_thresh = beta * sum(pcaks['pca'].explained_variance_ratio_)
-        for i in range(len(final_embs)):
-            emb = final_embs[i]
-            ksret = empirical_kstest(emb, scaler, pca, ecdfs, alpha)
+        ks_thresh = beta * sum(pca.explained_variance_ratio_)
+        # for i in range(len(final_embs)):
+        #     emb = final_embs[i]
+        #     ksret = empirical_kstest(emb, scaler, pca, ecdfs, alpha)
+        #     if ksret < ks_thresh:
+        #         factors[i] = round(gamma * ksret / ks_thresh, 2)
+        #     feat_factors.append((ksret, factors[i]))
+        #     if progress_cb:
+        #         progress_cb(100 * Fprg * (1 + float(i + 1) / len(final_embs)))
+        embs_feat = np.concatenate(final_embs, axis=0)
+        pca_out = pca.transform(scaler.transform(embs_feat))
+        tfp_cdf = ecdfs.cdf(pca_out).numpy()
+        print(embs_feat.shape, pca_out.shape, tfp_cdf.shape) 
+        M = len(final_embs)
+        for i in range(M):
+            indices = np.argsort(pca_out[i:i + N], axis=0)
+            cdfvals = np.take_along_axis(tfp_cdf[i:i + N], indices, axis=0)
+            # D = np.abs(CDF1 - cdfvals).max(axis=0)
+            Dmin = (cdfvals - CDF0).max(axis=0)
+            Dplus = (CDF1 - cdfvals).max(axis=0)
+            D = np.max([Dmin, Dplus], axis=0)
+            pvals = []
+            for d in D:
+                pvalue = 2 * stats.distributions.ksone.sf(d, N)
+                pvalue = np.clip(pvalue, 0, 1)
+                pvals.append(pvalue)
+            print(i, pvals)
+            pvals = np.array(pvals, dtype=np.float)
+            ksret = sum(pca.explained_variance_ratio_[pvals > alpha])
             if ksret < ks_thresh:
                 factors[i] = round(gamma * ksret / ks_thresh, 2)
             feat_factors.append((ksret, factors[i]))
             if progress_cb:
-                progress_cb(100 * Fprg * (1 + float(i + 1) / len(final_embs)))
+                progress_cb(100 * Fprg * (1 + float(i + 1) / M))
         within_period_scores *= factors.repeat(64)
         print('pcakstest time: %d secs' % (time.time() - start_time))
 
