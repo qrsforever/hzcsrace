@@ -31,10 +31,9 @@ ENV TZ=Asia/Shanghai \
     PYTHONIOENCODING=utf-8 \
     DEBIAN_FRONTEND=noninteractive \
     APT_INSTALL="apt install -y --no-install-recommends" \
-    PIP_INSTALL="pip3 install --no-cache-dir --retries 20 --timeout 120 --trusted-host mirrors.intra.didiyun.com --index-url http://mirrors.intra.didiyun.com/pip/simple"
+    PIP_INSTALL="pip3 install --no-cache-dir --retries 20 --timeout 120 --trusted-host mirrors.aliyun.com --index-url https://mirrors.aliyun.com/pypi/simple"
 
-RUN sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.didiyun\.com\/ubuntu\//g' /etc/apt/sources.list && \
-    rm /etc/apt/sources.list.d/cuda.list && rm /etc/apt/sources.list.d/nvidia-ml.list && \
+RUN rm /etc/apt/sources.list.d/cuda.list && rm /etc/apt/sources.list.d/nvidia-ml.list && \
     apt-get update --fix-missing && $APT_INSTALL \
         cmake locales \
         pkg-config tzdata iputils-ping net-tools \
