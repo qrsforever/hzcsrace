@@ -1,4 +1,4 @@
-FROM tensorflow/tensorflow:2.3.2-gpu
+FROM tensorflow/tensorflow:2.6.1-gpu
 
 LABEL maintainer="raceai@hzcsai.com"
 
@@ -46,7 +46,7 @@ RUN sed -i 's/http:\/\/archive\.ubuntu\.com\/ubuntu\//http:\/\/mirrors\.intra\.d
 
 RUN $PIP_INSTALL -U pip && \
         $PIP_INSTALL scikit-build zmq protobuf pyhocon omegaconf && \
-        $PIP_INSTALL opencv-python==4.3.0.36 opencv-contrib-python \
+        $PIP_INSTALL opencv-python==4.3.0.36 opencv-contrib-python tensorflow-probability==0.14.0 \
         scikit-learn statsmodels scipy==1.5.2 matplotlib tqdm==4.48.2 \
         Minio GPUtil
 
