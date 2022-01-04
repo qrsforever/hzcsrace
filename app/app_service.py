@@ -109,7 +109,6 @@ def _framework_inference():
 
 @app.route('/raceai/private/pushmsg', methods=['POST', 'GET'], endpoint='pushmsg')
 @catch_error
-@race_timeit(app_logger)
 def _framework_message_push():
     try:
         key = request.args.get("key", default='unknown')

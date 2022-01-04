@@ -1,18 +1,16 @@
 import numpy as np
+import time
 import tensorflow as tf
 from scipy.signal import medfilt
-from matplotlib.animation import FuncAnimation
-import matplotlib.pyplot as plt
-import matplotlib
 from repnet import ResnetPeriodEstimator
 
 from scipy import stats
 
 
-def empirical_kstest(emb, scaler, pca, ecdfs, alpha=0.01):
-    out = pca.transform(scaler.transform(emb))
-    pvals = np.array([stats.kstest(out[:, i], cdf=lambda x: ecdfs[i](x))[1] for i in range(out.shape[-1])])
-    return sum(pca.explained_variance_ratio_[pvals > alpha])
+N = 64
+
+CDF0 = (np.arange(0, N) / N).reshape((-1, 1))
+CDF1 = (np.arange(1.0, N + 1) / N).reshape((-1, 1))
 
 
 def get_repnet_model(logdir):
@@ -68,139 +66,6 @@ def unnorm(query_frame):
     return query_frame
 
 
-def create_count_video(frames,
-                       per_frame_counts,
-                       within_period,
-                       score,
-                       fps,
-                       output_file,
-                       delay,
-                       plot_count=True,
-                       plot_within_period=False,
-                       plot_score=False,
-                       vizualize_reps=False,
-                       progress_cb=None):
-    """Creates video with running count and within period predictions.
-
-  Args:
-    frames (List): List of images in form of NumPy arrays.
-    per_frame_counts (List): List of floats indicating repetition count for
-      each frame. This is the rate of repetition for that particular frame.
-      Summing this list up gives count over entire video.
-    within_period (List): List of floats indicating score between 0 and 1 if the
-      frame is inside the periodic/repeating portion of a video or not.
-    score (float): Score between 0 and 1 indicating the confidence of the
-      RepNet model's count predictions.
-    fps (int): Frames per second of the input video. Used to scale the
-      repetition rate predictions to Hz.
-    output_file (string): Path of the output video.
-    delay (integer): Delay between each frame in the output video.
-    plot_count (boolean): if True plots the count in the output video.
-    plot_within_period (boolean): if True plots the per-frame within period
-      scores.
-    plot_score (boolean): if True plots the confidence of the model along with
-      count ot within_period scores.
-  """
-    if output_file[-4:] not in ['.mp4', '.gif']:
-        raise ValueError('Output format can only be mp4 or gif')
-
-    if vizualize_reps:
-        return viz_reps(frames, per_frame_counts, score, output_file,
-                interval=delay, plot_score=plot_score,
-                progress_cb=progress_cb)
-
-    num_frames = len(frames)
-
-    running_counts = np.cumsum(per_frame_counts)
-    final_count = np.around(running_counts[-1]).astype(np.int)
-
-    def count(idx):
-        return int(np.round(running_counts[idx]))
-
-    def rate(idx):
-        return per_frame_counts[idx] * fps
-
-    if plot_count and not plot_within_period:
-        fig = plt.figure(figsize=(10, 12), tight_layout=True)
-        im = plt.imshow(unnorm(frames[0]))
-        if plot_score:
-            plt.suptitle('Pred Count: %d, '
-                         'Prob: %0.1f' % (final_count, score),
-                         fontsize=24)
-
-        plt.title('Count 0, Rate: 0', fontsize=24)
-        plt.axis('off')
-        plt.grid(b=None)
-
-        def update_count_plot(i):
-            """Updates the count plot."""
-            im.set_data(unnorm(frames[i]))
-            plt.title('Count %d, Rate: %0.4f Hz' % (count(i), rate(i)), fontsize=24)
-
-        anim = FuncAnimation(
-            fig,
-            update_count_plot,
-            frames=np.arange(1, num_frames),
-            interval=delay,
-            blit=False)
-        if output_file[-3:] == 'mp4':
-            anim.save(f"{output_file[:-4]}_{final_count:02d}.mp4", dpi=100, fps=None)
-        elif output_file[-3:] == 'gif':
-            anim.save(f"{output_file[:-4]}_{final_count:02d}.gif", writer='imagemagick', fps=None, dpi=100)
-
-    elif plot_within_period:
-        fig, axs = plt.subplots(1, 2, figsize=(12, 6))
-        im = axs[0].imshow(unnorm(frames[0]))
-        axs[1].plot(0, within_period[0])
-        axs[1].set_xlim((0, len(frames)))
-        axs[1].set_ylim((0, 1))
-
-        if plot_score:
-            plt.suptitle('Pred Count: %d, '
-                         'Prob: %0.1f' % (final_count, score),
-                         fontsize=24)
-
-        if plot_count:
-            axs[0].set_title('Count 0, Rate: 0', fontsize=20)
-
-        plt.axis('off')
-        plt.grid(b=None)
-
-        def update_within_period_plot(i):
-            """Updates the within period plot along with count."""
-            im.set_data(unnorm(frames[i]))
-            axs[0].set_xticks([])
-            axs[0].set_yticks([])
-            xs = []
-            ys = []
-            if plot_count:
-                axs[0].set_title('Count %d, Rate: %0.4f Hz' % (count(i), rate(i)),
-                                 fontsize=20)
-            for idx in range(i):
-                xs.append(idx)
-                ys.append(within_period[int(idx * len(within_period) / num_frames)])
-            axs[1].clear()
-            axs[1].set_title('Within Period or Not', fontsize=20)
-            axs[1].set_xlim((0, num_frames))
-            axs[1].set_ylim((-0.05, 1.05))
-            axs[1].plot(xs, ys)
-
-        anim = FuncAnimation(
-            fig,
-            update_within_period_plot,
-            frames=np.arange(1, num_frames),
-            interval=delay,
-            blit=False,
-        )
-
-        if output_file[-3:] == 'mp4':
-            anim.save(output_file, dpi=100, fps=None)
-        elif output_file[-3:] == 'gif':
-            anim.save(output_file, writer='imagemagick', fps=None, dpi=100)
-
-    plt.close()
-
-
 def get_counts(model, frames, strides, batch_size,
                threshold,
                within_period_threshold,
@@ -219,11 +84,16 @@ def get_counts(model, frames, strides, batch_size,
 
     frames = model.preprocess(frames)
 
-    for i, stride in enumerate(strides, 1):
+    Fprg = 1.0
+    if pcaks:
+        Fprg = 0.5
+
+    for i, stride in enumerate(strides):
         num_batches = int(np.ceil(seq_len / model.num_frames / stride / batch_size))
         raw_scores_per_stride = []
         within_period_score_stride = []
         embs_stride = []
+        Nprg = num_batches * len(strides)
         for batch_idx in range(num_batches):
             idxes = tf.range(batch_idx * batch_size * model.num_frames * stride,
                     (batch_idx + 1) * batch_size * model.num_frames * stride,
@@ -240,8 +110,8 @@ def get_counts(model, frames, strides, batch_size,
             within_period_score_stride.append(np.reshape(within_period_scores.numpy(),
                                                          [-1, 1]))
             embs_stride.append(embs)
-        if progress_cb:
-            progress_cb((100 * float(i)) / len(strides))
+            if progress_cb:
+                progress_cb((100 * Fprg * float(i * num_batches + batch_idx + 1)) / Nprg)
         raw_scores_per_stride = np.concatenate(raw_scores_per_stride, axis=0)
         raw_scores_list.append(raw_scores_per_stride)
         within_period_score_stride = np.concatenate(
@@ -262,21 +132,43 @@ def get_counts(model, frames, strides, batch_size,
 
     # QRS
     within_period_scores = within_period_scores_list[argmax_strides]
+    feat_factors = []
     if pcaks:
-        ks_thresh = sum(pcaks['pca'].explained_variance_ratio_) / 2
+        start_time = time.time()
+        factors = np.ones(len(final_embs))
         scaler = pcaks['scaler']
         pca = pcaks['pca']
         ecdfs = pcaks['ecdfs']
         alpha = pcaks.get('alpha', 0.01)
-        beta = pcaks.get('beta', 0.7)
-        factors = np.ones(len(final_embs))
-        for i in range(len(final_embs)):
-            emb = final_embs[i]
-            ksret = empirical_kstest(emb, scaler, pca, ecdfs, alpha)
+        beta = pcaks.get('beta', 0.5)
+        gamma = pcaks.get('gamma', 0.7)
+        ks_thresh = beta * sum(pca.explained_variance_ratio_)
+        embs_feat = np.concatenate(final_embs, axis=0)
+        pca_out = pca.transform(scaler.transform(embs_feat))
+        tfp_cdf = ecdfs.cdf(pca_out).numpy()
+        print(embs_feat.shape, pca_out.shape, tfp_cdf.shape) 
+        M = len(final_embs)
+        for i, j in enumerate(range(0, pca_out.shape[0], N)):
+            indices = np.argsort(pca_out[j:j + N], axis=0)
+            cdfvals = np.take_along_axis(tfp_cdf[j:j + N], indices, axis=0)
+            # Dmin = (cdfvals - CDF0).max(axis=0)
+            # Dplus = (CDF1 - cdfvals).max(axis=0)
+            # D = np.max([Dmin, Dplus], axis=0)
+            D = np.abs(CDF1 - cdfvals).max(axis=0)
+            pvals = []
+            for d in D:
+                pvalue = 2 * stats.distributions.ksone.sf(d, N)
+                pvals.append(pvalue)
+            pvals = np.array(pvals, dtype=np.float)
+            pvalue = np.clip(pvals, 0, 1)
+            ksret = sum(pca.explained_variance_ratio_[pvals > alpha])
             if ksret < ks_thresh:
-                factors[i] = beta * ksret / ks_thresh
-        factors = factors.repeat(64)
-        within_period_scores *= factors
+                factors[i] = round(gamma * ksret / ks_thresh, 2)
+            feat_factors.append((ksret, factors[i]))
+            if progress_cb:
+                progress_cb(100 * Fprg * (1 + float(i + 1) / M))
+        within_period_scores *= factors.repeat(64)
+        print('pcakstest time: %d secs' % (time.time() - start_time))
 
     within_period = np.repeat(
         within_period_scores, chosen_stride,
@@ -297,7 +189,7 @@ def get_counts(model, frames, strides, batch_size,
         pred_score = scores[max_period]
         pred_period = chosen_stride * (max_period + 1)
         per_frame_counts = (
-                np.asarray(seq_len * [1. / pred_period]) *
+                np.asarray(seq_len * [1. / pred_period]) * # noqa
                 np.asarray(within_period_binary))
     else:
         # Count each frame. More noisy but adapts to changes in speed.
@@ -337,7 +229,7 @@ def get_counts(model, frames, strides, batch_size,
         per_frame_counts = np.asarray(len(per_frame_counts) * [0.])
 
     return (pred_period, pred_score, within_period,
-            per_frame_counts, chosen_stride, final_embs, feature_maps)
+            per_frame_counts, chosen_stride, final_embs, feature_maps, feat_factors)
 
 
 def get_score(period_score, within_period_score):
@@ -352,124 +244,3 @@ def get_score(period_score, within_period_score):
     within_period_score = np.sqrt(within_period_score)
     pred_score = tf.reduce_mean(within_period_score)
     return pred_score, within_period_score
-
-
-def viz_reps(frames,
-             count,
-             score,
-             output_file,
-             alpha=1.0,
-             pichart=True,
-             colormap=plt.cm.PuBu,
-             num_frames=None,
-             interval=30,
-             plot_score=True,
-             progress_cb=None):
-
-    """Visualize repetitions."""
-    if isinstance(count, list):
-        counts = len(frames) * [count / len(frames)]
-    else:
-        counts = count
-    sum_counts = np.cumsum(counts)
-    fig, ax = plt.subplots(ncols=1, nrows=1, figsize=(5, 5),
-                           tight_layout=True, )
-
-    h, w, _ = np.shape(frames[0])
-    wedge_x = 95 / 112 * w
-    wedge_y = 17 / 112 * h
-    wedge_r = 15 / 112 * h
-    txt_x = 95 / 112 * w
-    txt_y = 19 / 112 * h
-    otxt_size = 62 / 112 * h
-
-    if plot_score:
-        plt.title('Score:%.2f' % score, fontsize=20)
-    im0 = ax.imshow(unnorm(frames[0]))
-
-    if not num_frames:
-        num_frames = len(frames)
-
-    if pichart:
-        wedge1 = matplotlib.patches.Wedge(
-            center=(wedge_x, wedge_y),
-            r=wedge_r,
-            theta1=0,
-            theta2=0,
-            color=colormap(1.),
-            alpha=alpha)
-        wedge2 = matplotlib.patches.Wedge(
-            center=(wedge_x, wedge_y),
-            r=wedge_r,
-            theta1=0,
-            theta2=0,
-            color=colormap(0.5),
-            alpha=alpha)
-
-        ax.add_patch(wedge1)
-        ax.add_patch(wedge2)
-        txt = ax.text(
-            txt_x,
-            txt_y,
-            '0',
-            size=35,
-            ha='center',
-            va='center',
-            alpha=0.9,
-            color='white',
-        )
-
-    else:
-        txt = ax.text(
-            txt_x,
-            txt_y,
-            '0',
-            size=otxt_size,
-            ha='center',
-            va='center',
-            alpha=0.8,
-            color=colormap(0.4),
-        )
-
-    def update(i):
-        """Update plot with next frame."""
-        im0.set_data(unnorm(frames[i]))
-        ctr = int(sum_counts[i])
-        if pichart:
-            if ctr % 2 == 0:
-                wedge1.set_color(colormap(1.0))
-                wedge2.set_color(colormap(0.5))
-            else:
-                wedge1.set_color(colormap(0.5))
-                wedge2.set_color(colormap(1.0))
-
-            wedge1.set_theta1(-90)
-            wedge1.set_theta2(-90 - 360 * (1 - sum_counts[i] % 1.0))
-            wedge2.set_theta1(-90 - 360 * (1 - sum_counts[i] % 1.0))
-            wedge2.set_theta2(-90)
-
-        txt.set_text(int(sum_counts[i]))
-        ax.grid(False)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        plt.tight_layout()
-
-        if progress_cb:
-            if i % 100 == 0:
-                progress_cb(round((100 * float(i)) / num_frames, 2))
-
-    anim = FuncAnimation(
-        fig,
-        update,
-        frames=num_frames,
-        interval=interval,
-        blit=False)
-
-    # final_count = np.around(np.sum(counts)).astype(np.int)
-
-    if output_file[-3:] == 'mp4':
-        anim.save(output_file, dpi=100, fps=None)
-    elif output_file[-3:] == 'gif':
-        anim.save(output_file, writer='imagemagick', fps=None, dpi=100)
-
-    plt.close()
