@@ -36,11 +36,11 @@ __start_raceai()
         --env REDIS_ADDR=${REDIS_ADDR} \
         --env REDIS_PORT=${REDIS_PORT} \
         --env REDIS_PSWD=${REDIS_PSWD} \
-        --volume /raceai/data:/raceai/data \
-        --volume /raceai/data/users/outputs:/outputs \
+        --volume /root/raceai/data:/raceai/data \
+        --volume /root/raceai/data/users/outputs:/outputs \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/projects:/raceai/codes/projects \
-        --volume /data/pretrained/cv:/root/.cache/torch/hub/checkpoints \
+        --volume /root/data/pretrained/cv:/root/.cache/torch/hub/checkpoints \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         $REPOSITORY $cmd
 }

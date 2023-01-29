@@ -20,8 +20,8 @@ __start_raceai()
         --env MODEL_WEIGHTS=pl_resnet18_acc90.pth \
         --env NUM_CLASSES=3 \
         --env TOPIC=zmq.cr.resnet18.inference \
-        --volume /raceai/data:/raceai/data \
-        --volume /raceai/data/ckpts/cleaner_robot:/ckpts \
+        --volume /root/raceai/data:/raceai/data \
+        --volume /root/raceai/data/ckpts/cleaner_robot:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         $REPOSITORY -s pl

@@ -1,4 +1,4 @@
-FROM hzcsk8s.io/pytorch1.12.1_cuda11.3
+FROM hzcsai_com/raceai_base
 
 LABEL maintainer="raceai@hzcsai.com"
 
@@ -24,6 +24,8 @@ LABEL org.label-schema.schema-version="1.0" \
       org.label-schema.version=$VERSION
 
 ENV PATH=/raceai/codes/bin:$PATH
+
+RUN $APT_INSTALL jq
 
 RUN $PIP_INSTALL zerorpc flask flask_cors omegaconf redis "jsonnet>=0.10.0" matplotlib
 

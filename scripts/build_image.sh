@@ -102,6 +102,8 @@ __build_image()
     fi
 }
 
+# ./build_image.sh Dockerfile.app
+
 __main()
 {
     dfile="Dockerfile"
