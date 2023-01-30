@@ -19,8 +19,8 @@ __start_raceai()
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-lprnet \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
-        --volume /raceai/data:/raceai/data \
-        --volume /raceai/data/ckpts/ccpd2019:/ckpts \
+        --volume /data/k12-nfs/raceai/data:/raceai/data \
+        --volume /data/k12-nfs/raceai/data/ckpts/ccpd2019:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         --volume $TOP_DIR/projects/yolov5:/raceai/codes/projects/yolov5 \

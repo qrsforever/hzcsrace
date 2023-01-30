@@ -33,11 +33,6 @@ ENV TZ=Asia/Shanghai \
     PATH=/raceai/codes/bin:$PATH \
     PYTHONPATH=/raceai/codes/app:/raceai/codes/projects:$PYTHONPATH    
 
-RUN apt update && $APT_INSTALL libgl1-mesa-glx libglib2.0-0 \
-    libjpeg-dev libpng-dev libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
-    libxvidcore-dev libx264-dev libatlas-base-dev gfortran \
-    ffmpeg
-
 # pytorch-lightning
 
 RUN $PIP_INSTALL pytorch-lightning

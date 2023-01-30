@@ -20,8 +20,8 @@ __start_raceai()
         --env MODEL_WEIGHTS=best.ckpt \
         --env NUM_CLASSES=5 \
         --env TOPIC=zmq.cc.resnet18.inference \
-        --volume /raceai/data:/raceai/data \
-        --volume /raceai/data/ckpts/cartoon_characters/checkpoints:/ckpts \
+        --volume /data/k12-nfs/raceai/data:/raceai/data \
+        --volume /data/k12-nfs/raceai/data/ckpts/cartoon_characters/checkpoints:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         $REPOSITORY -s pl

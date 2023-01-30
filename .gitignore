@@ -3,3 +3,4 @@ projects/.face_detection_dsfd
 projects/.fsgan
 projects/.sense
 **/**/nohup.out
+env.sh

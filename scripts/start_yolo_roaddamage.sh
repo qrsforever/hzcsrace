@@ -24,11 +24,11 @@ __start_raceai()
         --network host \
         --env TASK=$task \
         --env MODEL_LEVEL=$model \
-        --volume /raceai/data:/raceai/data \
-        --volume /raceai/data/ckpts/yolov5/road_damage:/ckpts \
+        --volume /data/k12-nfs/raceai/data:/raceai/data \
+        --volume /data/k12-nfs/raceai/data/ckpts/yolov5/road_damage:/ckpts \
+        --volume /data/k12-nfs/pretrained/cv:/root/.cache/torch/hub/checkpoints \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
-        --volume /data/pretrained/cv:/root/.cache/torch/hub/checkpoints \
         --volume $TOP_DIR/projects/yolov5:/raceai/codes/projects/yolov5 \
         $REPOSITORY $cmd
 }

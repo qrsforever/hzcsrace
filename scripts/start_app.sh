@@ -9,6 +9,8 @@
 CUR_FIL=${BASH_SOURCE[0]}
 TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 
+source ${TOP_DIR}/env.sh
+
 VENDOR=hzcsai_com
 PROJECT=raceai_app
 REPOSITORY="$VENDOR/$PROJECT"
@@ -36,11 +38,11 @@ __start_raceai()
         --env REDIS_ADDR=${REDIS_ADDR} \
         --env REDIS_PORT=${REDIS_PORT} \
         --env REDIS_PSWD=${REDIS_PSWD} \
-        --volume /root/raceai/data:/raceai/data \
-        --volume /root/raceai/data/users/outputs:/outputs \
+        --volume /data/k12-nfs/raceai/data:/raceai/data \
+        --volume /data/k12-nfs/raceai/data/users/outputs:/outputs \
+        --volume /data/k12-nfs/pretrained/cv:/root/.cache/torch/hub/checkpoints \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/projects:/raceai/codes/projects \
-        --volume /root/data/pretrained/cv:/root/.cache/torch/hub/checkpoints \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         $REPOSITORY $cmd
 }

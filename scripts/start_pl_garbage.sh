@@ -21,8 +21,8 @@ __start_raceai()
         --env MODEL_WEIGHTS=pl_resnet18_acc85.pth \
         --env NUM_CLASSES=4 \
         --env TOPIC=zmq.garbage.resnet18.inference \
-        --volume /raceai/data:/raceai/data \
-        --volume /raceai/data/ckpts/rgarbage:/ckpts \
+        --volume /data/k12-nfs/raceai/data:/raceai/data \
+        --volume /data/k12-nfs/raceai/data/ckpts/rgarbage:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
         --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
         $REPOSITORY -s pl
