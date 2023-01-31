@@ -13,7 +13,7 @@ import traceback
 import os # noqa
 import time
 import argparse
-# import raceai.runner # noqa
+import raceai.runner # noqa
 import zmq
 import redis
 
@@ -65,6 +65,7 @@ def _framework_inference():
     # with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
     #     json.dump(reqjson, fw)
     ####
+    app_logger(f'{reqjson}')
 
     if reqjson['task'].startswith('zmq'):
         if reqjson['task'] not in g_topics:
@@ -102,9 +103,15 @@ def _framework_inference():
         return json.dumps({'errno': 0})
 
     cfg = OmegaConf.create(reqjson['cfg'])
-    runner = Registrable.get_runner(reqjson['task'])
+    try:
+        runner = Registrable.get_runner(reqjson['task'])
+    except Exception:
+        app_logger(traceback.format_exc(limit=3))
     with race_subprocess(runner, cfg) as queue:
-        return queue.get()
+        app_logger(f'1111')
+        ret = queue.get()
+        app_logger(f'result: {ret}')
+        return ret
 
 
 @app.route('/raceai/private/pushmsg', methods=['POST', 'GET'], endpoint='pushmsg')

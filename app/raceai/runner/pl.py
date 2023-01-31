@@ -111,7 +111,7 @@ class PlTrainer(pl.Trainer):
             print(list(zip(paths, y_trues, y_preds)))
             return list(zip(paths, y_trues, F.softmax(y_preds, dim=1)))
 
-        def predict_epoch_end(self, outputs):
+        def predict_epoch_end(model, outputs):
             result = {'output':[]}
             for item in outputs:
                 for path, tag, preds in item:
@@ -127,7 +127,8 @@ class PlTrainer(pl.Trainer):
                             'values': probs_sorted.values.numpy().astype(float).tolist(),
                             'indices': probs_sorted.indices.numpy().astype(int).tolist()
                         }})
-            self.log_dict(result)
+            # self.log_dict(result) # error
+            model.result = [result]
         try:
             _test_step = getattr(model.__class__, 'test_step', None)
             _test_epoch_end = getattr(model.__class__, 'test_epoch_end', None)
@@ -136,8 +137,8 @@ class PlTrainer(pl.Trainer):
             # load checkpoint
             ckpt = pl_load(self.resume_from_checkpoint, map_location=lambda storage, loc: storage)
             model.load_state_dict(ckpt['state_dict'])
-            return self.test(model, test_dataloaders=test_loader,
-                   verbose=True)
+            self.test(model, dataloaders=test_loader, verbose=True)
+            return model.result
         except Exception as err:
             raise err
         finally:
