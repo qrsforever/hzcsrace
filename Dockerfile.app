@@ -25,7 +25,7 @@ LABEL org.label-schema.schema-version="1.0" \
 
 ENV PATH=/raceai/codes/bin:$PATH
 
-RUN $PIP_INSTALL zerorpc flask flask_cors omegaconf redis "jsonnet>=0.10.0" matplotlib
+RUN $PIP_INSTALL zerorpc flask flask_cors omegaconf redis "jsonnet>=0.10.0" matplotlib pandas seaborn
 
 SHELL ["/bin/bash"]               
 COPY entrypoint.sh /entrypoint.sh

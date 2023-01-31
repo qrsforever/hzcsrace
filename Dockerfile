@@ -33,9 +33,13 @@ ENV TZ=Asia/Shanghai \
     PATH=/raceai/codes/bin:$PATH \
     PYTHONPATH=/raceai/codes/app:/raceai/codes/projects:$PYTHONPATH    
 
+# patch: high pytorch -> low yolo
+RUN sed -i '/recompute_scale_factor=self.recompute_scale_factor/d' /opt/conda/lib/python3.7/site-packages/torch/nn/modules/upsampling.py \
+    && sed -i 's/, self.align_corners,/, self.align_corners)/g' /opt/conda/lib/python3.7/site-packages/torch/nn/modules/upsampling.py
+
 # pytorch-lightning
 
-RUN $PIP_INSTALL pytorch-lightning
+RUN $PIP_INSTALL pytorch-lightning matplotlib pandas seaborn
 
 # detectron2
 
