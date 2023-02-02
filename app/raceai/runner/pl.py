@@ -50,7 +50,7 @@ class PlClassifier(pl.LightningModule):
 
     def training_epoch_end(self, outputs):
         log = {
-            'lr': self._get_lr(),
+            'lr': self._get_lr()[0], # TODO
             'train_loss': torch.stack([x['loss'] for x in outputs]).mean()
         }
         if 'acc' in outputs[0]:

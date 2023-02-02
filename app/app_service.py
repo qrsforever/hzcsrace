@@ -211,6 +211,6 @@ if __name__ == "__main__":
     except Exception as err:
         app_logger('{}'.format(err))
     try:
-        app.run(host=args.host, port=args.port, debug=bool(args.debug))
+        app.run(host=args.host, port=args.port, debug=False) # bool(args.debug))
     finally:
         pass

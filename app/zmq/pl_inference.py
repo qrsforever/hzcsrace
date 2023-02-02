@@ -58,7 +58,6 @@ def classifer(opt):
             data_loader = race_load_class(cfg.data.class_name)(cfg.data.params).get()
             for images, labels, paths in data_loader:
                 y_preds = model(images)
-                print(y_preds)
                 y_preds = F.softmax(y_preds, dim=1)
                 for path, tag, y_pred in list(zip(paths, labels, y_preds)):
                     if isinstance(tag, torch.Tensor):
@@ -78,7 +77,7 @@ def classifer(opt):
             resdata['running_time'] = round(time.time() - stime, 3)
             Logger.info('time consuming: [%.2f]s' % (resdata['running_time']))
             race_report_result(msgkey, resdata)
-            print(resdata)
+            Logger.info(resdata)
         except Exception:
             resdata['errno'] = -1 # todo
             resdata['traceback'] = traceback.format_exc()
