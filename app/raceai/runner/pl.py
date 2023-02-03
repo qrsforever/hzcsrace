@@ -135,6 +135,7 @@ class PlTrainer(pl.Trainer):
             setattr(model.__class__, 'test_step', predict_step)
             setattr(model.__class__, 'test_epoch_end', predict_epoch_end)
             # load checkpoint
+            model.result = [{'output':[]}]
             ckpt = pl_load(self.resume_from_checkpoint, map_location=lambda storage, loc: storage)
             model.load_state_dict(ckpt['state_dict'])
             self.test(model, dataloaders=test_loader, verbose=True)

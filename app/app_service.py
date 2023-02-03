@@ -65,6 +65,7 @@ def _framework_inference():
     # with open('/raceai/data/tmp/raceai.inference.json', 'w') as fw:
     #     json.dump(reqjson, fw)
     ####
+    pid = os.getpid()
     app_logger(f'{reqjson}')
 
     if reqjson['task'].startswith('zmq'):
@@ -105,13 +106,11 @@ def _framework_inference():
     cfg = OmegaConf.create(reqjson['cfg'])
     try:
         runner = Registrable.get_runner(reqjson['task'])
+        result = runner(cfg)
+        app_logger(result)
     except Exception:
         app_logger(traceback.format_exc(limit=3))
-    with race_subprocess(runner, cfg) as queue:
-        app_logger(f'1111')
-        ret = queue.get()
-        app_logger(f'result: {ret}')
-        return ret
+    return result
 
 
 @app.route('/raceai/private/pushmsg', methods=['POST', 'GET'], endpoint='pushmsg')
