@@ -76,11 +76,23 @@ def race_convert_dictkeys(x, uppercase=True):
     return x
 
 
+HTTP_PROXY = os.environ.get('PRI_HTTP_PROXY', '')
+
 def race_data(x, path='/raceai/data/tmp'):
     if x.startswith('http') or x.startswith('ftp'):
         x = parse.quote(x, safe=':/?-=')
-        r = request.urlretrieve(x, os.path.join(path, os.path.basename(x)))
-        x = r[0]
+        p = os.path.join(path, os.path.basename(x))
+        if HTTP_PROXY:
+            r = request.urlretrieve(x, p)
+            x = r[0]
+        else:
+            with open(p, 'wb') as fw:
+                r = requests.get(x, allow_redirects=True, proxies={
+                    'http': f'http://{HTTP_PROXY}',
+                    'https': f'http://{HTTP_PROXY}'
+                    })
+                fw.write(r.content)
+            x = p
     elif x.startswith('oss://'):
         raise NotImplementedError('weight schema: oss')
     elif x.startswith('file://'):

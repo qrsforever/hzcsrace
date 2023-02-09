@@ -35,6 +35,9 @@ class BaseDataLoader(object):
     def get(self):
         return self.dataloader
 
+    def clr(self):
+        pass
+
 
 class Base64DataLoader(BaseDataLoader):
     def __init__(self, cfg):
@@ -46,10 +49,14 @@ class Base64DataLoader(BaseDataLoader):
                 suffix = 'wav'
             elif data[0].find('flac') > 0:
                 suffix = 'flac'
-        filepath = os.path.join('/tmp', 'b64_%02d.%s' % (100 * time.time() % 99, suffix))
+        filepath = os.path.join('/tmp', 'b64_%d.%s' % (1000 * time.time(), suffix))
         with open(filepath, 'wb') as fout:
             fout.write(base64.b64decode(data[-1]))
         super().__init__(filepath, cfg)
+        self.filepath = filepath
+
+    def clr(self):
+        os.remove(self.filepath)
 
 
 class JsonBase64DataLoader(BaseDataLoader):
@@ -63,17 +70,27 @@ class JsonBase64DataLoader(BaseDataLoader):
                 fout.write(base64.b64decode(b64str.split(',')[-1]))
             file_paths.append(imgpath)
         super().__init__(file_paths, cfg)
+        self.file_paths = file_paths
 
+    def clr(self):
+        for path in self.file_paths:
+            os.remove(path)
+        
 
 class ListBase64DataLoader(BaseDataLoader):
     def __init__(self, cfg):
         file_paths = []
         for b64str in cfg.data_source:
-            imgpath = os.path.join('/tmp', 'b64_%02d.png' % (time.time() % 99))
+            imgpath = os.path.join('/tmp', 'b64_%d.png' % (1000 * time.time()))
             with open(imgpath, 'wb') as fout:
                 fout.write(base64.b64decode(b64str.split(',')[-1]))
             file_paths.append(imgpath)
         super().__init__(file_paths, cfg)
+        self.file_paths = file_paths
+
+    def clr(self):
+        for path in self.file_paths:
+            os.remove(path)
 
 
 class PathListDataLoader(BaseDataLoader):

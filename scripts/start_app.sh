@@ -30,6 +30,8 @@ else
     cmd="-s app"
 fi
 
+HTTP_PROXY=${HTTP_PROXY:-''}
+
 __start_raceai()
 {
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-app \
@@ -38,6 +40,7 @@ __start_raceai()
         --env REDIS_ADDR=${REDIS_ADDR} \
         --env REDIS_PORT=${REDIS_PORT} \
         --env REDIS_PSWD=${REDIS_PSWD} \
+        --env PRI_HTTP_PROXY=${HTTP_PROXY} \
         --volume /data/k12-nfs/raceai/data:/raceai/data \
         --volume /data/k12-nfs/raceai/data/users/outputs:/outputs \
         --volume /data/k12-nfs/pretrained/cv:/root/.cache/torch/hub/checkpoints \

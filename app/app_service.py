@@ -66,7 +66,7 @@ def _framework_inference():
     #     json.dump(reqjson, fw)
     ####
     pid = os.getpid()
-    app_logger(f'{reqjson}')
+    app_logger(f'pid:{pid}:{reqjson}')
 
     if reqjson['task'].startswith('zmq'):
         if reqjson['task'] not in g_topics:
@@ -104,12 +104,23 @@ def _framework_inference():
         return json.dumps({'errno': 0})
 
     cfg = OmegaConf.create(reqjson['cfg'])
+
     try:
-        runner = Registrable.get_runner(reqjson['task'])
+        task_topic = reqjson['task']
+        for i in range(30):
+            res = g_redis.get(task_topic)
+            if res is None or res.decode() != '1':
+                break
+            time.sleep(0.3)
+        g_redis.getset(task_topic, 1)
+        g_redis.expire(task_topic, 10)
+        runner = Registrable.get_runner(task_topic)
         result = runner(cfg)
-        app_logger(result)
+        app_logger(f'pid:{pid}: {result}')
     except Exception:
         app_logger(traceback.format_exc(limit=3))
+    finally:
+        g_redis.getset(task_topic, 0)
     return result
 
 

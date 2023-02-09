@@ -8,6 +8,8 @@
 CUR_FIL=${BASH_SOURCE[0]}
 TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 
+source ${TOP_DIR}/env.sh
+
 VENDOR=hzcsai_com
 PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
@@ -24,6 +26,7 @@ __start_raceai()
         --network host \
         --env TASK=$task \
         --env MODEL_LEVEL=$model \
+        --env HTTP_PROXY=${HTTP_PROXY} \
         --volume /data/k12-nfs/raceai/data:/raceai/data \
         --volume /data/k12-nfs/raceai/data/ckpts/yolov5/road_damage:/ckpts \
         --volume /data/k12-nfs/pretrained/cv:/root/.cache/torch/hub/checkpoints \

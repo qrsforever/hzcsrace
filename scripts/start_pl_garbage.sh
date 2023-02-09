@@ -9,6 +9,8 @@
 CUR_FIL=${BASH_SOURCE[0]}
 TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 
+source ${TOP_DIR}/env.sh
+
 VENDOR=hzcsai_com
 PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
@@ -21,6 +23,7 @@ __start_raceai()
         --env MODEL_WEIGHTS=pl_resnet18_acc85.pth \
         --env NUM_CLASSES=4 \
         --env TOPIC=zmq.garbage.resnet18.inference \
+        --env PRI_HTTP_PROXY=${HTTP_PROXY} \
         --volume /data/k12-nfs/raceai/data:/raceai/data \
         --volume /data/k12-nfs/raceai/data/ckpts/rgarbage:/ckpts \
         --volume $TOP_DIR/app:/raceai/codes/app \
