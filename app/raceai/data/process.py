@@ -49,7 +49,7 @@ class Base64DataLoader(BaseDataLoader):
                 suffix = 'wav'
             elif data[0].find('flac') > 0:
                 suffix = 'flac'
-        filepath = os.path.join('/tmp', 'b64_%d.%s' % (1000 * time.time(), suffix))
+        filepath = os.path.join('/tmp', 'b64_%f.%s' % (time.time(), suffix))
         with open(filepath, 'wb') as fout:
             fout.write(base64.b64decode(data[-1]))
         super().__init__(filepath, cfg)
@@ -81,7 +81,7 @@ class ListBase64DataLoader(BaseDataLoader):
     def __init__(self, cfg):
         file_paths = []
         for b64str in cfg.data_source:
-            imgpath = os.path.join('/tmp', 'b64_%d.png' % (1000 * time.time()))
+            imgpath = os.path.join('/tmp', 'b64_%f.png' % time.time())
             with open(imgpath, 'wb') as fout:
                 fout.write(base64.b64decode(b64str.split(',')[-1]))
             file_paths.append(imgpath)

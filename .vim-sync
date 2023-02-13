@@ -1,7 +1,7 @@
 #!/bin/bash
 
-remote_hostname='gamma102'
-remote_relative_path='workspace/codes/hzcsai_com/hzcsrace'
+remote_hostname='k8-storage'
+remote_relative_path='/data/k12-nfs/codes/hzcsrace'
 
 cd $(dirname $0)
 

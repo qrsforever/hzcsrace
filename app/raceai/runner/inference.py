@@ -52,18 +52,15 @@ def image_classifier_test_pl(cfg):
 
     data_loader = data_loader_class(cfg.data.params)
 
-    try:
-        # Model
-        bbmodel = race_load_class(cfg.model.class_name)(cfg.model.params)
+    # Model
+    bbmodel = race_load_class(cfg.model.class_name)(cfg.model.params)
 
-        # Test
-        trainer = PlTrainer(False, None, **cfg.trainer)
-        classifer = PlClassifier(bbmodel, None, None)
-        result = trainer.predict(classifer, data_loader.get())
-        data_loader.clr()
-        return {'errno': 0, 'result': result[0]['output']}
-    except Exception as err:
-        return {'erron': -1, 'result': {}}
+    # Test
+    trainer = PlTrainer(False, None, **cfg.trainer)
+    classifer = PlClassifier(bbmodel, None, None)
+    result = trainer.predict(classifer, data_loader.get())
+    data_loader.clr()
+    return {'errno': 0, 'result': result[0]['output']}
 
 
 # @catch_error
