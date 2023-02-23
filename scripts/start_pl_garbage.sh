@@ -20,6 +20,7 @@ __start_raceai()
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-pl.garbage \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
+        --restart unless-stopped \
         --env MODEL_WEIGHTS=pl_resnet18_acc85.pth \
         --env NUM_CLASSES=4 \
         --env TOPIC=zmq.garbage.resnet18.inference \

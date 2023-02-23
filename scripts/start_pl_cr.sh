@@ -19,6 +19,7 @@ __start_raceai()
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-pl.cr \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
+        --restart unless-stopped \
         --env MODEL_WEIGHTS=pl_resnet18_acc90.pth \
         --env NUM_CLASSES=3 \
         --env TOPIC=zmq.cr.resnet18.inference \

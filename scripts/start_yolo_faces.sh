@@ -24,6 +24,7 @@ __start_raceai()
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-yolov5-$task-$model \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
+        --restart unless-stopped \
         --env TASK=$task \
         --env MODEL_LEVEL=$model \
         --env PRI_HTTP_PROXY=${HTTP_PROXY} \

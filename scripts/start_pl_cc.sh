@@ -18,6 +18,7 @@ __start_raceai()
 {
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-pl.cc \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
+        --restart unless-stopped \
         --network host \
         --env MODEL_WEIGHTS=best.ckpt \
         --env NUM_CLASSES=5 \

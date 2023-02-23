@@ -19,6 +19,7 @@ __start_raceai()
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-pl.fruit \
         --shm-size=10g --ulimit memlock=-1 --ulimit stack=67108864 \
         --network host \
+        --restart unless-stopped \
         --env MODEL_WEIGHTS=best.ckpt \
         --env NUM_CLASSES=5 \
         --env TOPIC=zmq.fruit.resnet18.inference \
