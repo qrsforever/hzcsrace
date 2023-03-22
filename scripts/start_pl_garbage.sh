@@ -9,11 +9,13 @@
 CUR_FIL=${BASH_SOURCE[0]}
 TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 
-source ${TOP_DIR}/env
+source ${TOP_DIR}/_env
 
 VENDOR=hzcsai_com
 PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
+
+HTTP_PROXY=${PRI_HTTP_PROXY:-''}
 
 __start_raceai()
 {

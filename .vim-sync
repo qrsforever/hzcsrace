@@ -1,7 +1,7 @@
 #!/bin/bash
 
 remote_hostnames=('p40' 'k8-storage')
-remote_relative_path=('/data/hzcsai_com/hzcsk12' '/data/k12-nfs/codes/hzcsk12')
+remote_relative_path=('/data/hzcsai_com/hzcsrace' '/data/k12-nfs/codes/hzcsrace')
 
 cd $(dirname $0)
 

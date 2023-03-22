@@ -19,6 +19,8 @@ cmd="-s yolov5"
 task="faces"
 model="l" # [s,l,x]
 
+HTTP_PROXY=${PRI_HTTP_PROXY:-''}
+
 __start_raceai()
 {
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-yolov5-$task-$model \

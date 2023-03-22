@@ -14,6 +14,8 @@ VENDOR=hzcsai_com
 PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
 
+HTTP_PROXY=${PRI_HTTP_PROXY:-''}
+
 __start_raceai()
 {
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-pl.cc \
@@ -24,8 +26,8 @@ __start_raceai()
         --env NUM_CLASSES=5 \
         --env TOPIC=zmq.cc.resnet18.inference \
         --env PRI_HTTP_PROXY=${HTTP_PROXY} \
-        --volume {DATA_ROOT}/raceai/data:/raceai/data \
-        --volume {DATA_ROOT}/raceai/data/ckpts/cartoon_characters/checkpoints:/ckpts \
+        --volume ${DATA_ROOT}/raceai/data:/raceai/data \
+        --volume ${DATA_ROOT}/raceai/data/ckpts/cartoon_characters/checkpoints:/ckpts \
         --volume ${TOP_DIR}/app:/raceai/codes/app \
         --volume ${TOP_DIR}/entrypoint.sh:/entrypoint.sh \
         $REPOSITORY -s pl

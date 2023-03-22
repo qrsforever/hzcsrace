@@ -30,7 +30,7 @@ else
     cmd="-s app"
 fi
 
-HTTP_PROXY=${HTTP_PROXY:-''}
+HTTP_PROXY=${PRI_HTTP_PROXY:-''}
 
 __start_raceai()
 {

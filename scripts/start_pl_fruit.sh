@@ -14,6 +14,8 @@ VENDOR=hzcsai_com
 PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
 
+HTTP_PROXY=${PRI_HTTP_PROXY:-''}
+
 __start_raceai()
 {
     docker run -d${arg} --runtime nvidia --name ${PROJECT}-pl.fruit \

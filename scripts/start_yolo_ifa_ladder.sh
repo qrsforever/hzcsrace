@@ -13,6 +13,7 @@ source ${TOP_DIR}/_env
 VENDOR=hzcsai_com
 PROJECT=raceai
 REPOSITORY="$VENDOR/$PROJECT"
+HTTP_PROXY=${PRI_HTTP_PROXY:-''}
 
 arg=""
 cmd="-s yolov5"
