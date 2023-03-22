@@ -1,16 +1,13 @@
 #!/bin/bash
 
-remote_hostname='k8-storage'
-remote_relative_path='/data/k12-nfs/codes/hzcsrace'
+remote_hostnames=('p40' 'k8-storage')
+remote_relative_path=('/data/hzcsai_com/hzcsk12' '/data/k12-nfs/codes/hzcsk12')
 
 cd $(dirname $0)
 
-if [[ 'upload' == $1 ]]
-then
-    rsync -azcul --exclude ".git" --relative "$2/$3" "$remote_hostname:$remote_relative_path"
-elif [[ 'download' == $1 ]]
-then
-    rsync -azcul --exclude ".git" "$remote_hostname:$remote_relative_path/$2/$3" "$2/$3"
-fi
+for (( i=0; i<${#remote_hostnames[@]}; i++ ))
+do
+    rsync -azcul --exclude ".git" --relative "$2/$3" "${remote_hostnames[$i]}:${remote_relative_path[$i]}"
+done
 
 cd -

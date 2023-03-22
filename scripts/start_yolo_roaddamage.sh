@@ -8,7 +8,7 @@
 CUR_FIL=${BASH_SOURCE[0]}
 TOP_DIR=`cd $(dirname $CUR_FIL)/..; pwd`
 
-source ${TOP_DIR}/env.sh
+source ${TOP_DIR}/_env
 
 VENDOR=hzcsai_com
 PROJECT=raceai
@@ -27,12 +27,12 @@ __start_raceai()
         --env TASK=$task \
         --env MODEL_LEVEL=$model \
         --env HTTP_PROXY=${HTTP_PROXY} \
-        --volume /data/k12-nfs/raceai/data:/raceai/data \
-        --volume /data/k12-nfs/raceai/data/ckpts/yolov5/road_damage:/ckpts \
-        --volume /data/k12-nfs/pretrained/cv:/root/.cache/torch/hub/checkpoints \
-        --volume $TOP_DIR/app:/raceai/codes/app \
-        --volume $TOP_DIR/entrypoint.sh:/entrypoint.sh \
-        --volume $TOP_DIR/projects/yolov5:/raceai/codes/projects/yolov5 \
+        --volume ${DATA_ROOT}/raceai/data:/raceai/data \
+        --volume ${DATA_ROOT}/raceai/data/ckpts/yolov5/road_damage:/ckpts \
+        --volume ${DATA_ROOT}/pretrained/cv:/root/.cache/torch/hub/checkpoints \
+        --volume ${TOP_DIR}/app:/raceai/codes/app \
+        --volume ${TOP_DIR}/entrypoint.sh:/entrypoint.sh \
+        --volume ${TOP_DIR}/projects/yolov5:/raceai/codes/projects/yolov5 \
         $REPOSITORY $cmd
 }
 

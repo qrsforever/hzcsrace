@@ -1,0 +1,8 @@
+#!/bin/bash
+
+export DATA_ROOT='/data/k12ai'
+# export REDIS_ADDR=172.21.0.2
+export REDIS_ADDR=81.70.134.40
+export REDIS_PORT=10090
+export REDIS_PSWD='qY3Zh4xLPZNMkaz3'
+export PRI_HTTP_PROXY="${HOST_LAN_IP}:8118"
